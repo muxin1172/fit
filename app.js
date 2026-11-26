@@ -209,11 +209,11 @@ function toast(msg,isError=false,undo=null){
  if(undo){const b=document.createElement('button');b.type='button';b.textContent='撤销';b.onclick=()=>{clearTimeout(toast.t);undo();e.classList.remove('visible');};e.append(b);}
  e.classList.add('visible');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('visible'),undo?5000:3400);
 }
-function requestConfirmation(message,onConfirm){
+function requestConfirmation(message,onConfirm,actionLabel='确认删除'){
  document.getElementById('inlineConfirmation')?.remove();
  const bar=document.createElement('div');bar.id='inlineConfirmation';bar.className='inline-confirmation';bar.setAttribute('role','alertdialog');bar.setAttribute('aria-label',message);
  const text=document.createElement('span');text.textContent=message;bar.append(text);
- const yes=document.createElement('button');yes.textContent='确认删除';yes.className='btn btn-danger';yes.onclick=()=>{bar.remove();onConfirm();};
+ const yes=document.createElement('button');yes.textContent=actionLabel;yes.className='btn btn-danger';yes.onclick=()=>{bar.remove();onConfirm();};
  const no=document.createElement('button');no.textContent='取消';no.className='btn';no.onclick=()=>bar.remove();bar.append(yes,no);
  (document.querySelector('.ml-overlay:not([hidden]) .ml-dialog')||document.body).append(bar);no.focus({preventScroll:true});
 }
@@ -410,8 +410,8 @@ function renderHistory() {
  } else {
   const sorted=groups.map(([key,items])=>({key,items,label:labelFor(key,items)})).sort((a,b)=>a.label.localeCompare(b.label,'zh'));
   html=sorted.map(({key,items,label})=>`<section class="history-view-group" data-history-group="${historyMode}">
-   <h3>${h(historyMode==='action'?recordAction(items[0]):key)}${historyMode==='action'?`<small>${h(recordMuscle(items[0]))}</small>`:''}</h3>
-   ${renderHistoryDays(items,historyMode,'new')}
+   <h3 class="${recordAction(items[0]).includes('待确认')?'needs-confirmation':''}">${h(historyMode==='action'?recordAction(items[0]):key)}${historyMode==='action'?`<small>${h(recordMuscle(items[0]))}</small>`:''}</h3>
+   ${historyMode==='action'?`<button type="button" class="btn btn-small" data-rename-action="${h(recordAction(items[0]))}" data-rename-muscle="${h(recordMuscle(items[0]))}">重命名 / 合并到标准动作</button>`:''}${renderHistoryDays(items,historyMode,'new')}
   </section>`).join('');
  }
  document.querySelector('#historyList').innerHTML=html||'<div class="empty-state">暂无训练记录</div>';
@@ -789,7 +789,7 @@ const ACTION_GROUPS={
   ['站姿提踵','Standing Calf Raise','器械'],['坐姿提踵','Seated Calf Raise','器械'],['腿举机提踵','Leg Press Calf Raise','器械'],['哑铃提踵','Dumbbell Calf Raise','哑铃'],['单腿提踵','Single-Leg Calf Raise','自重']]
 };
 const CATALOG=Object.entries(ACTION_GROUPS).flatMap(([muscle,items])=>items.map(([zh,en,equipment])=>({muscle,zh,en,equipment})));
-let catalogMuscle='背部',catalogEquip='全部',catalogSelected=null;
+let catalogMuscle='背部',catalogEquip='全部',catalogSelected=null,renameActionSource=null;
 const EQ_OPTIONS=['全部','器械','哑铃','训练凳','绳索','杠铃','自重'];
 function renderRecentActionChips(){
  // 从本版本开始新保存的训练才加入快捷入口；旧记录只在历史页展示。
@@ -975,6 +975,7 @@ function renderCatalogPreview(){
 }
 function applyCatalogAction(zh){
  const a=CATALOG.find(x=>x.zh===zh);if(!a)return;
+ if(renameActionSource){const original=renameActionSource;renameActionSource=null;requestConfirmation(`将「${original.name}」合并为「${a.zh}」？`,()=>{for(const row of records)if(row.name===original.name&&row.muscle===original.muscle){row.sourceName=row.sourceName||row.name;row.name=a.zh;row.muscle=a.muscle;}saveRecords();closeOverlay('pickerOverlay');syncTrainingViews();toast('动作名称已合并');},'确认合并');return;}
  catalogSelected=a;catalogMuscle=a.muscle;choosingCatalogGif=false;
  document.querySelector('#trainMuscle').value=a.muscle;document.querySelector('#trainName').value=a.zh;
  document.getElementById('quickAction').value=a.zh;document.getElementById('quickMuscle').value=a.muscle;prefillQuickAction();
@@ -1345,3 +1346,5 @@ function refreshDateBoundary(){const next=today();if(next===lastObservedToday)re
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDateBoundary();});window.addEventListener('focus',refreshDateBoundary);
 
 document.getElementById('quickUnit').addEventListener('change',saveQuickUnit);
+
+document.getElementById('historyList').addEventListener('click',e=>{const b=e.target.closest('[data-rename-action]');if(!b)return;renameActionSource={name:b.dataset.renameAction,muscle:b.dataset.renameMuscle};catalogMuscle=renameActionSource.muscle;catalogEquip='全部';renderCatalog();openOverlay('pickerOverlay');void ensureGifs();});
