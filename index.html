@@ -5,17 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="dark" />
 <title>MotionLog · 你的训练档案</title>
-<!--
-  MotionLog 单文件版 · 原生 HTML/CSS/JavaScript + Three.js
-  使用方法：保存为 HTML 文件并通过 Chrome 双击打开。首次加载 3D/GIF 需要联网。
-  数据保存：训练与打卡保存在 localStorage，图片保存在本浏览器 IndexedDB。
-  注意：Human Atlas 的实际格式是 atlas.json + gzip 二进制网格，不是 glTF/GLB。
-        这里实现专用解码器，出错时自动使用程序化生成的轻量三维肌肉模型。
-  资源：ashemag/human-atlas (BodyParts3D 4.0, CC BY 4.0)
-        hasaneyldrm/exercises-dataset (GIF © Gym visual，详见原仓库 NOTICE.md)
--->
+
 <link rel="stylesheet" href="app.css">
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"}}</script>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -31,8 +23,8 @@
 </aside>
 <main class="main">
   <div class="topbar"><div class="crumb">个人空间 <span> / 训练中心</span></div><div class="top-actions"><span class="today-label" id="clockDate"></span><button class="btn btn-ghost btn-small" id="exportBtn">导出备份</button><button class="btn btn-primary btn-small" id="quickAdd">＋ 记录训练</button></div></div>
-  <!-- 模块一：今日训练。把录入流程作为首页核心，而不是藏进二级导航。 -->
-  <!-- ================== V6 首页：记录与打卡是唯一的首屏任务 ================== -->
+  
+  
   <section id="dashboard" class="view active">
     <div class="quick-home">
       <header class="quick-hero">
@@ -67,10 +59,10 @@
         <div class="quick-checkin-copy"><div class="quick-checkin-dot" id="quickCheckinDot">✓</div><div><h2 id="quickCheckinTitle">完成今日打卡</h2><p id="quickCheckinSub"></p></div></div>
         <div class="quick-checkin-actions"><button type="button" id="quickPhoto" class="quick-photo" aria-haspopup="dialog">＋ 照片 / 感受</button><button type="button" id="quickCheckinBtn" class="quick-checkin-btn">✓ 完成打卡</button></div>
       </section>
-      <div class="quick-links" aria-label="其他功能"><button type="button" id="quickShowMap">3D 肌群地图 <span>↗</span></button><button type="button" id="quickShowInsights">训练概览 <span>↗</span></button><button type="button" id="quickGoHistory">数据趋势 <span>↗</span></button></div>
+      <div class="quick-links" aria-label="其他功能"><button type="button" id="quickShowInsights">训练概览 <span>↗</span></button><button type="button" id="quickGoHistory">数据趋势 <span>↗</span></button></div>
     </div>
   </section>
-  <!-- ================== V6 可选弹窗：不在首屏堆叠重型内容 ================== -->
+  
   <div class="ml-overlay" id="pickerOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="pickerDialogTitle">
     <div class="ml-dialog ml-dialog-picker"><div class="ml-dialog-top"><div><div class="panel-kicker">EXERCISES</div><h2 id="pickerDialogTitle">选择训练动作</h2></div><button class="ml-close" type="button" data-close-overlay="pickerOverlay" aria-label="关闭动作选择器">×</button></div>
     <aside aria-label="中英双语训练动作库" class="panel library-panel">
@@ -101,18 +93,6 @@
 </section></div>
     </div>
   </div>
-  <div class="ml-overlay" id="atlasOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="atlasDialogTitle">
-    <div class="ml-dialog ml-dialog-atlas"><div class="ml-dialog-top"><div><div class="panel-kicker">INTERACTIVE ATLAS</div><h2 id="atlasDialogTitle">3D 肌群地图</h2></div><button class="ml-close" type="button" data-close-overlay="atlasOverlay" aria-label="关闭肌群地图">×</button></div>
-      <div class="dashboard-grid">
-<section class="panel model-panel"><div class="panel-head"><div><div class="panel-kicker">INTERACTIVE MUSCLE ATLAS</div><h2>3D 肌群</h2></div><button class="btn btn-small btn-ghost" id="modelToggle" title="切换精细/轻量三维模型">切换轻量模型</button></div>
-<div class="model-shell"><div id="threeHost"></div><div class="model-status" id="modelStatus">正在初始化 3D 模型…</div><div class="model-controls"><button id="zoomIn" title="放大">＋</button><button id="zoomOut" title="缩小">−</button><button id="resetCam" title="重置视角">↺</button></div><div class="orientation"><button class="active" id="frontView">正面</button><button id="backView">背面</button></div></div>
-<div class="model-hint"><span>拖拽旋转 · 滚轮缩放 · 点击肌肉选中</span><strong id="modelChoiceLabel">当前：背部</strong></div>
-</section>
-<section class="panel focus-panel"><div><div class="focus-overline">TARGET MUSCLE GROUP</div><div class="focus-title"><span class="focus-icon">↗</span><span id="focusName">背部</span></div><p class="focus-intro" id="focusIntro"></p></div><div class="pills" id="regionPills"></div><div class="focus-divider"></div><div class="exercise-bar"><h3>训练动作 GIF</h3><small id="gifCount">来自 exercises-dataset</small></div><div class="gif-list" id="gifList"><div class="placeholder">正在加载公开动作库…</div></div><div class="selected-exercise-details" id="exerciseDetails" style="display:none"></div><div class="focus-footer"><button class="btn btn-primary" id="addFocused">＋ 记录这个肌群</button><div class="media-note" style="margin-top:9px">GIF © Gym visual · 仅用于个人参考</div></div></section>
-</div>
-      <details class="asset-attribution"><summary>资源来源</summary><p>3D 人体数据 © BodyParts3D / DBCLS · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a> · 动作 GIF © Gym visual · Three.js MIT</p></details>
-    </div>
-  </div>
   <div class="ml-overlay" id="insightsOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="insightsDialogTitle">
     <div class="ml-dialog ml-dialog-insights"><div class="ml-dialog-top"><div><div class="panel-kicker">OVERVIEW</div><h2 id="insightsDialogTitle">训练概览</h2></div><button class="ml-close" type="button" data-close-overlay="insightsOverlay" aria-label="关闭训练概览">×</button></div>
       <div class="dashboard-stats stat-strip"><div class="stat"><div class="stat-label">活跃日</div><div class="stat-value" id="statDays">—</div><div class="stat-footer">已知日期</div></div><div class="stat"><div class="stat-label">已记录动作</div><div class="stat-value" id="statExercises">—</div><div class="stat-footer">含历史导入</div></div><div class="stat"><div class="stat-label">确认组数</div><div class="stat-value" id="statSets">—</div><div class="stat-footer">旧记录未计入</div></div><div class="stat"><div class="stat-label">训练肌群</div><div class="stat-value" id="statMuscles">—<small>/ 8</small></div><div class="stat-footer">持续覆盖全身</div></div></div><div class="bottom-grid"><section class="panel recent-panel"><div class="panel-head"><h2>最近的训练</h2><button class="btn btn-small btn-ghost" data-jump="history">查看全部</button></div><div class="recent-list" id="recentList"></div></section><section class="panel distribution-panel"><div class="panel-head"><h2>肌群训练分布</h2><small class="subtle">按已确认的训练组数</small></div><div class="bars" id="distribution"></div><div class="panel-footer-note">仅统计明确记录的训练组；旧记录组数未知时不纳入。</div></section></div>
@@ -123,10 +103,10 @@
       <form id="quickPhotoForm"><label class="quick-photo-label" for="quickNote">今天的感受 <small>可选</small></label><textarea id="quickNote" rows="3" placeholder="今天有什么进步？"></textarea><label class="quick-photo-upload" for="quickFiles">＋ 上传照片 <small>支持多张图片</small><input type="file" id="quickFiles" accept="image/*" multiple></label><div id="quickFilePreviews" class="quick-file-previews"></div><button type="submit" class="quick-save" id="quickSavePhoto">保存并打卡</button></form>
     </div>
   </div>
-  <!-- 模块二：可视化历史。一个日期对应一个训练日，不再重复堆叠单动作大卡片。 -->
+  
   <section id="history" class="view">
     <div class="page-head"><div><div class="eyebrow">TRAINING HISTORY</div><h1>训练历史</h1><div id="historyCheckinPulse" class="history-checkin-pulse" aria-live="polite"></div></div><div class="history-data-actions"><button type="button" class="btn btn-ghost btn-small" id="mergeTrainingNotes">补录这批训练</button><button type="button" class="btn btn-ghost btn-small" id="importBtn">导入备份</button></div></div>
-    <!-- 数据分析先于明细：周训练量统计和肌群比例，不再重复打卡页的日历。 -->
+    
     <div class="analytics-intro"><span class="eyebrow">ACTIVITY OVERVIEW</span><h2>训练概览</h2></div>
     <div class="analytics-grid">
       <section class="panel analytics-panel" aria-labelledby="weekChartTitle"><div class="panel-head"><div><div class="panel-kicker">LAST 12 WEEKS</div><h2 id="weekChartTitle">每周活跃日</h2></div><span class="chart-legend-dot"><i></i>训练 / 打卡</span></div>
@@ -186,7 +166,7 @@
       <div id="historyList" class="sessions-list"></div>
     </section>
   </section>
-  <!-- 模块三：日历强视觉区分有训练 / 有照片 / 当天已打卡，并保留照片的 IndexedDB 存储。 -->
+  
   <section id="checkin" class="view"><div class="page-head"><div><div class="eyebrow">DAILY TRACKER</div><h1>训练日历</h1></div><button class="btn btn-primary" id="todayCheckin">回到今天</button></div>
     <div class="checkin-overview" id="checkinStats"></div>
     <div class="calendar-layout"><section class="panel calendar-panel"><div class="calendar-top"><button class="btn btn-small" id="prevMonth" aria-label="上个月"><span class="nav-chevron left"></span></button><h2 id="monthLabel">—</h2><button class="btn btn-small" id="nextMonth" aria-label="下个月"><span class="nav-chevron right"></span></button></div><div class="calendar-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div><div class="calendar-days" id="calendarDays"></div><div class="cal-color-legend"><span><i class="legend-swatch base"></i>未记录</span><span><i class="legend-swatch trained"></i>有训练</span><span><i class="legend-swatch completed"></i>已打卡</span><span><i class="legend-swatch photo"></i>有照片</span></div></section>
@@ -196,99 +176,7 @@
   <input type="file" id="importFile" class="import-file" accept="application/json,.json" />
 </main></div><div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script src="app.js"></script>
-<script type="module">
-/* ================== 模块 H：Three.js 真实 Human Atlas + 轻量 3D 模型 ================== */
-import * as THREE from 'three';
-import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
-const host=document.getElementById('threeHost'),label=document.getElementById('modelStatus');
-let renderer,scene,camera,controls,modelRoot,selected='背部',modelMode='atlas',atlasReady=false,atlasGroup=null;
-const picker=[],colorBase=0x667786,colorHot=0x95e9d0;
-try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;host.appendChild(renderer.domElement);}catch(err){label.textContent='浏览器暂不支持 WebGL：'+err.message;throw err;}
-scene=new THREE.Scene();camera=new THREE.PerspectiveCamera(33,1,.03,45);camera.position.set(1.65,1.08,3.65);
-controls=new OrbitControls(camera,renderer.domElement);controls.target.set(0,.93,0);controls.enableDamping=true;controls.dampingFactor=.07;controls.minDistance=1.1;controls.maxDistance=9;controls.enablePan=false;
-scene.add(new THREE.HemisphereLight(0xc2ecff,0x314057,2));let light=new THREE.DirectionalLight(0xfff7ee,2.2);light.position.set(-2,4,5);scene.add(light);light=new THREE.DirectionalLight(0x91d9ff,1.25);light.position.set(3,2,-3);scene.add(light);
-const floor=new THREE.Mesh(new THREE.CircleGeometry(.85,64),new THREE.MeshBasicMaterial({color:0x263f48,transparent:true,opacity:.6,side:THREE.DoubleSide}));floor.rotation.x=-Math.PI/2;floor.position.y=-.08;scene.add(floor);
-const ring=new THREE.Mesh(new THREE.RingGeometry(.68,.685,80),new THREE.MeshBasicMaterial({color:0x5b8b8a,transparent:true,opacity:.45,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.y=-.077;scene.add(ring);
-modelRoot=new THREE.Group();scene.add(modelRoot);
-function mat(color=0x708699,opacity=1){return new THREE.MeshStandardMaterial({color,roughness:.68,metalness:.05,side:THREE.DoubleSide,transparent:opacity<1,opacity});}
-const defaultMat=mat(0x667786), quietMat=mat(0x395064), accentMat=mat(colorHot),boneMat=mat(0x788c9c);
-function piece(group,region,geometry,x,y,z,sx,sy,sz,rotationZ=0,rotationX=0,baseMaterial=defaultMat){const mesh=new THREE.Mesh(geometry,baseMaterial.clone());mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);mesh.rotation.z=rotationZ;mesh.rotation.x=rotationX;mesh.userData.region=region;mesh.userData.original=baseMaterial.color.clone();group.add(mesh);if(region)picker.push(mesh);return mesh;}
-function ell(group,region,x,y,z,sx,sy,sz,rz=0,rx=0,base=defaultMat){return piece(group,region,new THREE.SphereGeometry(1,18,12),x,y,z,sx,sy,sz,rz,rx,base);}
-function buildLightweight(){picker.length=0;const g=new THREE.Group();g.name='lite';
- // 头部、颈部、上半身与骨盆：按照成年人体的自然比例构造，只做健身可视化而非医学解剖。
- ell(g,null,0,1.79,0,.109,.149,.095,0,0,boneMat);ell(g,null,0,1.57,0,.065,.09,.065,0,0,boneMat);
- ell(g,null,0,1.23,0,.228,.365,.112,0,0,quietMat);ell(g,null,0,.95,0,.174,.14,.12,0,0,quietMat);
- for(const side of [-1,1]){
-   // 肩：三角肌；胸大肌分成左右两块；背阔肌可从背面单独点击。
-   ell(g,'肩部',side*.245,1.49,0,.125,.135,.141,side*.24);
-   ell(g,'胸部',side*.106,1.425,.114,.116,.126,.053,side*.17);
-   ell(g,'背部',side*.13,1.37,-.115,.13,.235,.065,side*.16);
-   ell(g,'背部',side*.085,1.58,-.11,.085,.092,.045,side*.2);
-   // 上臂：肱二头肌在前，肱三头肌在后。
-   ell(g,'二头肌',side*.308,1.246,.071,.074,.157,.073,side*.09);
-   ell(g,'三头肌',side*.323,1.233,-.062,.072,.17,.067,side*.08);
-   // 前臂 + 手掌
-   ell(g,null,side*.358,.98,0,.065,.175,.064,side*.09,0,boneMat);
-   ell(g,null,side*.377,.795,0,.05,.07,.038,0,0,boneMat);
-   // 腹部：三组腹直肌和外斜肌
-   for(let row=0;row<3;row++)ell(g,'腹部',side*.071,1.28-row*.109,.106,.061,.055,.035,side*.07);
-   ell(g,'腹部',side*.162,1.159,.071,.053,.162,.042,side*.12);
-   // 腿部与小腿
-   ell(g,'腿部',side*.125,.703,.005,.118,.245,.122,side*.04);
-   ell(g,'腿部',side*.118,.46,-.018,.088,.102,.083,side*.02);
-   ell(g,'小腿',side*.138,.259,-.029,.073,.182,.075,side*.04);
-   ell(g,null,side*.136,.065,.064,.081,.047,.139,0,0,boneMat);
- }
- ell(g,'背部',0,1.38,-.135,.066,.315,.038);
- return g;
-}
-const lite=buildLightweight();modelRoot.add(lite);
-function tintRegion(name){for(const m of picker){const region=m.userData.region;const base=m.userData.original||new THREE.Color(colorBase);m.material.color.copy(region===name?new THREE.Color(colorHot):base);m.material.emissive?.setHex(region===name?0x1d6557:0x000000);m.material.emissiveIntensity=region===name?.36:0;}}
-window.motionModelSelect=name=>{selected=name;tintRegion(name);};tintRegion(selected);
-// 用真实 Human Atlas 肌肉名称映射为 8 个可选健身分组。
-function detectRegion(name){const s=String(name||'').toLowerCase();for(const [region,words] of Object.entries({
- '胸部':['pectoralis','pectoral'], '肩部':['deltoid','supraspinatus','subscapularis'],
- '二头肌':['biceps brachii','brachialis','brachioradialis'], '三头肌':['triceps'],
- '腹部':['rectus abdominis','oblique','transversus abdominis'], '小腿':['gastrocnemius','soleus','tibialis anterior'],
- '腿部':['vastus','rectus femoris','biceps femoris','gluteus','semimembranosus','semitendinosus','adductor longus'],
- '背部':['latissimus','trapezius','rhomboid','erector spinae','infraspinatus','teres major']
- }))if(words.some(w=>s.includes(w)))return region;return null;}
-const ATLAS_BASE='https://cdn.jsdelivr.net/gh/ashemag/human-atlas@main/public/';
-function atlasURL(path){const p=String(path||'').replace(/^\//,'');return ATLAS_BASE+(p.startsWith('models/')?p:'models/'+p);}
-async function downloadChunk(chunk){const candidates=chunk.gzip?[chunk.gzip,chunk.url]:[chunk.url];let err;for(const path of candidates){try{const res=await fetch(atlasURL(path));if(!res.ok)throw Error('HTTP '+res.status);let bytes=await res.arrayBuffer();const b=new Uint8Array(bytes);if(b[0]===0x1f&&b[1]===0x8b){if(!('DecompressionStream' in window))throw Error('浏览器缺少 gzip 解压能力');bytes=await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();}if(chunk.bytes&&bytes.byteLength!==chunk.bytes)throw Error('网格字节数不匹配');return bytes;}catch(e){err=e;}}throw err;}
-let atlasBusy=false;
-async function loadAtlas(){if(atlasBusy||atlasReady)return;atlasBusy=true;label.textContent='正在读取 Human Atlas 元数据…';try{
- const res=await fetch(ATLAS_BASE+'models/atlas.json');if(!res.ok)throw Error('atlas.json 请求失败');const atlas=await res.json();if(!Array.isArray(atlas.parts)||!Array.isArray(atlas.chunks))throw Error('Atlas 清单格式错误');const muscleParts=atlas.parts.filter(p=>String(p.system).toLowerCase().includes('muscle'));
- if(!muscleParts.length)throw Error('清单未发现肌肉系统');const requiredChunks=[...new Set(muscleParts.map(p=>p.chunk))].sort((a,b)=>a-b);
- const tempGroup=new THREE.Group();tempGroup.name='atlas';const newPick=[];let done=0;
- // 每个源部件具有独立 offsets / 顶点数 / 法线及索引，可直接创建 BufferGeometry。
- for(const ci of requiredChunks){const buf=await downloadChunk(atlas.chunks[ci]);const parts=muscleParts.filter(p=>p.chunk===ci);for(const p of parts){try{
-   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(buf,p.positions,p.vertexCount*3),3));geometry.setAttribute('normal',new THREE.BufferAttribute(new Int16Array(buf,p.normals,p.vertexCount*3),3,true));geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(buf,p.indices,p.indexCount),1));
-   const region=detectRegion(p.name);const material=mat(region?0x819a9a:0x536476);const m=new THREE.Mesh(geometry,material);m.userData.region=region;m.userData.original=material.color.clone();m.userData.partName=p.name;tempGroup.add(m);if(region)newPick.push(m);
-  }catch(err){console.warn('跳过异常网格',p.name,err);}}
-   done++;label.textContent=`Human Atlas 真实网格：${Math.round(done/requiredChunks.length*100)}% · 已加载 ${tempGroup.children.length} 个肌肉结构`;
- }
- if(newPick.length<10)throw Error('有效可点击肌肉数不足');atlasGroup=tempGroup;atlasReady=true;
- if(modelMode==='atlas'){modelRoot.remove(lite);modelRoot.add(atlasGroup);picker.length=0;picker.push(...newPick);}
- tintRegion(selected);label.textContent=`Human Atlas · ${tempGroup.children.length} 个肌肉网格 · 点击肌群`;
- }catch(err){console.warn('Human Atlas 载入失败，回退轻量模型',err);label.textContent='轻量模型已启用 · Atlas 远程资源未加载：'+err.message;modelMode='lite';document.getElementById('modelToggle').textContent='尝试精细模型';}
- finally{atlasBusy=false;}
-}
-// 视图控制：相机围绕身体中心，正反面视角保持同一目标点。
-function setCamera(angle=1){const d=3.6;if(angle===1)camera.position.set(.15,1.06,d);else camera.position.set(-.15,1.06,-d);controls.target.set(0,.93,0);controls.update();document.getElementById('frontView').classList.toggle('active',angle===1);document.getElementById('backView').classList.toggle('active',angle===-1);}
-document.getElementById('frontView').onclick=()=>setCamera(1);document.getElementById('backView').onclick=()=>setCamera(-1);
-document.getElementById('resetCam').onclick=()=>setCamera(1);document.getElementById('zoomIn').onclick=()=>{camera.position.sub(controls.target).multiplyScalar(.84).add(controls.target);controls.update();};document.getElementById('zoomOut').onclick=()=>{camera.position.sub(controls.target).multiplyScalar(1.18).add(controls.target);controls.update();};
-document.getElementById('modelToggle').onclick=()=>{if(modelMode==='atlas'){modelMode='lite';if(atlasGroup)modelRoot.remove(atlasGroup);modelRoot.add(lite);picker.length=0;lite.traverse(m=>{if(m.isMesh&&m.userData.region)picker.push(m);});label.textContent='轻量肌肉模型 · 8 个肌群';document.getElementById('modelToggle').textContent='切换精细模型';tintRegion(selected);}else{modelMode='atlas';document.getElementById('modelToggle').textContent='切换轻量模型';if(atlasReady){modelRoot.remove(lite);modelRoot.add(atlasGroup);picker.length=0;atlasGroup.traverse(m=>{if(m.isMesh&&m.userData.region)picker.push(m);});label.textContent='Human Atlas · 精细肌肉网格';tintRegion(selected);}else loadAtlas();}};
-// 指针事件：鼠标拖动超过 6px 时不触发肌群选择，以免误选。
-const raycaster=new THREE.Raycaster(),pointer=new THREE.Vector2();let startPoint=null;
-renderer.domElement.addEventListener('pointerdown',e=>{startPoint={x:e.clientX,y:e.clientY};});
-renderer.domElement.addEventListener('pointerup',e=>{if(!startPoint)return;const dist=Math.hypot(e.clientX-startPoint.x,e.clientY-startPoint.y);startPoint=null;if(dist>6)return;const rect=renderer.domElement.getBoundingClientRect();pointer.set((e.clientX-rect.left)/rect.width*2-1,-(e.clientY-rect.top)/rect.height*2+1);raycaster.setFromCamera(pointer,camera);const hit=raycaster.intersectObjects(picker,false)[0];if(hit?.object.userData.region){const region=hit.object.userData.region;document.querySelector(`#regionPills [data-region="${region}"]`)?.click();}});
-renderer.domElement.addEventListener('pointercancel',()=>startPoint=null);
-function resize(){const w=host.clientWidth,h=host.clientHeight;if(!w||!h)return;camera.aspect=w/h;camera.updateProjectionMatrix();renderer.setSize(w,h,false);}
-new ResizeObserver(resize).observe(host);resize();
-let frame;function animate(){frame=requestAnimationFrame(animate);controls.update();renderer.render(scene,camera);}animate();setCamera(1);
-label.textContent='轻量模型可用 · 正在获取 Human Atlas…';loadAtlas();
-</script>
+
 </body>
 </html>
 <script src="sync.js"></script>

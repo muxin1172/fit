@@ -220,7 +220,6 @@ function showView(view){if(view==='record')view='dashboard';document.querySelect
 document.querySelector('#nav').addEventListener('click',e=>{const b=e.target.closest('button[data-view]');if(b)showView(b.dataset.view);});
 document.querySelectorAll('[data-jump]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.jump)));
 document.querySelector('#quickAdd').addEventListener('click',()=>openEditor());
-document.querySelector('#addFocused').addEventListener('click',()=>openEditor(null,selectedRegion,selectedAction));
 function renderDashboard(){
  const dates=new Set([...records.map(r=>r.date).filter(Boolean),...Object.entries(checkins).filter(([,c])=>c?.completed).map(([d])=>d)]);
  document.querySelector('#statDays').textContent=dates.size;
@@ -233,28 +232,12 @@ function renderDashboard(){
  const counts=MUSCLE_NAMES.map(m=>({name:m,count:records.filter(r=>r.muscle===m).reduce((sum,r)=>sum+(r.sets||[]).filter(set=>set&&set.verified===true).length,0)})).sort((a,b)=>b.count-a.count), max=Math.max(1,...counts.map(x=>x.count));
  document.querySelector('#distribution').innerHTML=counts.map(x=>`<div class="bar-line"><span>${x.name}</span><div class="bar-track"><div class="bar-fill" style="width:${x.count/max*100}%"></div></div><span class="bar-num">${x.count}</span></div>`).join('');
 }
-function setRegion(name){if(!REGIONS[name])return;selectedRegion=name;document.querySelector('#focusName').textContent=name;document.querySelector('#focusIntro').textContent=REGIONS[name].intro;document.querySelector('#modelChoiceLabel').textContent=`当前：${name}`;document.querySelector('#regionPills').innerHTML=MUSCLE_NAMES.map(m=>`<button type="button" data-region="${m}" class="pill ${m===name?'active':''}">${m}</button>`).join('');selectedAction='';document.querySelector('#exerciseDetails').style.display='none';window.motionModelSelect?.(name);renderGifs();}
-document.querySelector('#regionPills').addEventListener('click',e=>{const b=e.target.closest('button[data-region]');if(b)setRegion(b.dataset.region);});
 
-/* ================== 模块 C：在线动作数据与 GIF（不伪造动作匹配） ================== */
 const EXERCISES_ROOT='https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/';
 let exerciseDatabase=null, gifError='', gifsLoading=null;
-async function ensureGifs(){if(exerciseDatabase || gifError)return;if(gifsLoading)return gifsLoading;gifsLoading=(async()=>{try{const r=await fetch(EXERCISES_ROOT+'data/exercises.json');if(!r.ok)throw Error('HTTP '+r.status);const a=await r.json();if(!Array.isArray(a))throw Error('动作 JSON 格式不正确');exerciseDatabase=a;}catch(e){gifError=e.message||String(e);}finally{renderGifs();renderCatalogPreview();}})();return gifsLoading;}
+async function ensureGifs(){if(exerciseDatabase || gifError)return;if(gifsLoading)return gifsLoading;gifsLoading=(async()=>{try{const r=await fetch(EXERCISES_ROOT+'data/exercises.json');if(!r.ok)throw Error('HTTP '+r.status);const a=await r.json();if(!Array.isArray(a))throw Error('动作 JSON 格式不正确');exerciseDatabase=a;}catch(e){gifError=e.message||String(e);}finally{renderCatalogPreview();}})();return gifsLoading;}
 function mediaUrl(path){if(!path)return '';if(/^https?:\/\//.test(path))return path;return EXERCISES_ROOT+String(path).replace(/^\.\//,'').replace(/^\//,'');}
-function matchingGifs(){if(!exerciseDatabase)return [];const keys=REGIONS[selectedRegion].search;const scores=exerciseDatabase.map(e=>{
- const name=String(e.name||''), text=[e.category,e.body_part,e.target,e.muscle_group,...(Array.isArray(e.secondary_muscles)?e.secondary_muscles:[])].join(' ').toLowerCase(), full=(text+' '+name).toLowerCase();let score=0;for(let i=0;i<keys.length;i++){if(text.includes(keys[i]))score+=i===0?8:4;if(name.toLowerCase().includes(keys[i]))score+=2;}
- // 避免只因辅助肌群包含目标而优先推荐明显属于其它主要肌群的动作。
- if(!e.gif_url||!full)score=0;return {e,score};}).filter(x=>x.score>=4).sort((a,b)=>b.score-a.score || String(a.e.name).localeCompare(String(b.e.name)));
- return scores.slice(0,8).map(x=>x.e);
-}
-function renderGifs(){const host=document.querySelector('#gifList');if(!exerciseDatabase){host.innerHTML=gifError?`<div class="placeholder">动作库加载失败：${h(gifError)}<br>请检查网络，仍可正常记录训练。<button type="button" class="btn btn-small" id="retryGifs">重试</button></div>`:'<div class="placeholder">正在加载 exercises-dataset 动作库…<br><span style="font-size:10px">首载 JSON 较大，请保持联网</span></div>';document.querySelector('#gifCount').textContent='在线动作数据库';if(gifError)document.querySelector('#retryGifs').onclick=()=>{gifError='';gifsLoading=null;ensureGifs();};return;}
- const data=matchingGifs();document.querySelector('#gifCount').textContent=`${data.length} 个演示 · 点击查看`;
- if(!data.length){host.innerHTML='<div class="placeholder">当前肌群没有可靠的 GIF 匹配结果。可手动输入动作名称。</div>';return;}
- host.innerHTML=data.slice(0,6).map((e,i)=>`<button type="button" class="gif-card" data-exidx="${i}"><img loading="lazy" alt="${h(e.name)}动作演示" src="${h(mediaUrl(e.gif_url))}" onerror="this.style.display='none'"/><div class="gif-info"><strong>${h(e.name)}</strong><small>${h(e.target||e.category||'查看动作')} · 查看详情</small></div></button>`).join('');
-}
-document.querySelector('#gifList').addEventListener('click',e=>{const b=e.target.closest('button[data-exidx]');if(!b)return;const ex=matchingGifs()[Number(b.dataset.exidx)];if(!ex)return;selectedAction=String(ex.name||'');const detail=document.querySelector('#exerciseDetails');detail.style.display='block';detail.innerHTML=`<b>${h(ex.name)}</b><br>器械：${h(ex.equipment||'未注明')}<br>${h(String(ex.instructions_zh||ex.instructions_en||'数据集中暂无动作指导').slice(0,430))}<br><a href="https://github.com/hasaneyldrm/exercises-dataset" target="_blank" rel="noopener noreferrer">来源：exercises-dataset / Gym visual</a>`;});
 
-/* ================== 模块 D：逐组录入、校验、修改 ================== */
 let draftSets=[];
 const blankSet=()=>({weight:'',reps:'',failureAt:'',formBreakAt:'',unit:'lb',plus:false,verified:true});
 function initFormFields(){document.querySelector('#trainMuscle').innerHTML=MUSCLE_NAMES.map(m=>`<option>${m}</option>`).join('');}
@@ -1008,7 +991,7 @@ function openOverlay(id){
  mlReturnFocus=document.activeElement;node.hidden=false;mlActiveOverlay=node;
  document.body.style.overflow='hidden';
  const target=node.querySelector('[data-close-overlay]');target?.focus({preventScroll:true});
- if(id==='atlasOverlay')window.dispatchEvent(new Event('resize'));
+ 
 }
 function closeOverlay(id){
  const node=document.getElementById(id);if(!node)return;
@@ -1175,7 +1158,7 @@ document.getElementById('quickAction').addEventListener('change',()=>{
 });
 document.getElementById('quickMuscle').addEventListener('change',renderLastWorkout);
 document.getElementById('quickDate').addEventListener('change',refreshQuickHome);
-document.getElementById('openPicker').addEventListener('click',()=>{catalogMuscle=document.getElementById('quickMuscle').value;catalogEquip='全部';renderCatalog();openOverlay('pickerOverlay');});
+document.getElementById('openPicker').addEventListener('click',()=>{catalogMuscle=document.getElementById('quickMuscle').value;catalogEquip='全部';renderCatalog();openOverlay('pickerOverlay');void ensureGifs();});
 document.getElementById('quickAdvanced').addEventListener('click',()=>{
  openEditor(null,document.getElementById('quickMuscle').value,document.getElementById('quickAction').value.trim());
  document.querySelector('#trainDate').value=document.getElementById('quickDate').value;
@@ -1198,7 +1181,6 @@ document.getElementById('quickForm').addEventListener('submit',e=>{
  toast('已记录 1 组',false,()=>{for(const r of records)r.sets=r.sets.filter(set=>set.id!==s.id);records=records.filter(r=>r.sets.length);saveRecords();syncTrainingViews();});document.getElementById('quickWeight').focus();
 });
 document.getElementById('quickTodayList').addEventListener('click',e=>{const b=e.target.closest('[data-quick-edit]');if(b)openEditor(b.dataset.quickEdit);const del=e.target.closest('[data-remove-set]');if(del)removeTrainingRecord(del.dataset.removeSet,+del.dataset.setIndex);});
-document.getElementById('quickShowMap').addEventListener('click',()=>openOverlay('atlasOverlay'));
 document.getElementById('quickShowInsights').addEventListener('click',()=>{renderDashboard();openOverlay('insightsOverlay');});
 document.getElementById('quickGoHistory').addEventListener('click',()=>showView('history'));
 document.getElementById('quickPhoto').addEventListener('click',()=>openOverlay('quickCheckinOverlay'));
@@ -1331,9 +1313,9 @@ refreshQuickHome();
 
 /* 页面初始化：先将 CRUD/旧记录功能启动；Three.js 使用另一个 ES module 加载 */
 initFormFields();document.querySelector('#clockDate').textContent=new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date());
-document.querySelector('#heroDate').textContent=new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric',weekday:'long'}).format(new Date());setRegion('背部');renderDashboard();renderHistory();document.querySelector('#checkinDate').value=TODAY;chooseDay(TODAY);catalogMuscle='背部';renderCatalog();renderRecentActionChips();showView('dashboard');ensureGifs();
+document.querySelector('#heroDate').textContent=new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric',weekday:'long'}).format(new Date());renderDashboard();renderHistory();document.querySelector('#checkinDate').value=TODAY;chooseDay(TODAY);catalogMuscle='背部';renderCatalog();renderRecentActionChips();showView('dashboard');
 if (trainingNotesSaveFailed) toast('补录已显示，浏览器未能完成本地保存',true);
 // CDN 可能被浏览器扩展或离线环境阻断；超时后给出明确提示，而不是永久显示加载中。
-setTimeout(()=>{if(!document.querySelector('#threeHost canvas'))document.querySelector('#modelStatus').textContent='3D 渲染未启动：请联网后在 Chrome 中重新打开（Three.js 使用 CDN）。';},18000);
+
 
 document.getElementById('deleteRecord').addEventListener('click',()=>removeTrainingRecord(editingId));
