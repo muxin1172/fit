@@ -38,7 +38,7 @@
           <div class="quick-muscle-first"><label for="quickMuscle">今天练哪个部位？</label><div class="quick-muscle-controls"><select id="quickMuscle" aria-label="选择训练肌群"></select><a class="btn btn-small btn-ghost last-workout-jump" href="#lastWorkoutPanel">上次记录</a></div></div>
           <div class="quick-action-head"><label for="quickAction">动作</label></div>
           <div class="quick-action-input"><input id="quickAction" aria-label="训练动作" placeholder="动作名称" maxlength="90" required list="quickActionSuggestions" autocomplete="off"/><datalist id="quickActionSuggestions"></datalist><button type="button" id="openPicker" class="quick-browse" aria-haspopup="dialog" title="打开动作库"><span aria-hidden="true">⌕</span> 动作库</button></div>
-          <div class="quick-values"><label class="quick-value-box"><span>重量</span><input id="quickWeight" type="number" min="0" step="any" inputmode="decimal" placeholder="0" required></label><label class="quick-value-box"><span>次数</span><input id="quickReps" type="number" min="1" step="1" inputmode="numeric" placeholder="0" required></label><label class="quick-value-box quick-unit-box"><span>单位</span><select id="quickUnit"><option value="lb">lb</option><option value="kg">kg</option><option value="片">片</option><option value="">未标单位</option></select></label></div>
+          <div class="quick-values"><label class="quick-value-box"><span>重量</span><input id="quickWeight" type="number" min="0" step="any" inputmode="decimal" placeholder="自重"></label><label class="quick-value-box"><span>次数</span><input id="quickReps" type="number" min="1" step="1" inputmode="numeric" placeholder="次数"></label><label class="quick-value-box"><span>时长（秒，选填）</span><input id="quickDuration" type="number" min="1" step="1" inputmode="numeric" placeholder="如 60"></label><label class="quick-value-box quick-unit-box"><span>单位</span><select id="quickUnit"><option value="lb">lb</option><option value="kg">kg</option><option value="片">片</option><option value="">未标单位</option></select></label></div>
           <div class="quick-form-actions"><button class="quick-save" type="submit"><span>＋</span> 记录这一组</button><button type="button" class="quick-more" id="quickAdvanced">更多选项 <span>↗</span></button></div>
         </form>
       </section>
@@ -135,7 +135,7 @@
               <div id="trendMetrics" class="segmented-control" role="group" aria-label="趋势指标">
                 <button type="button" data-trend-metric="weight" aria-pressed="true">重量</button>
                 <button type="button" data-trend-metric="reps" aria-pressed="false">次数</button>
-                <button type="button" data-trend-metric="volume" aria-pressed="false">训练量</button>
+                <button type="button" data-trend-metric="duration" aria-pressed="false">时长</button><button type="button" data-trend-metric="volume" aria-pressed="false">训练量</button>
               </div>
               <select id="trendUnits" class="trend-unit-select" aria-label="趋势重量单位" hidden></select>
             </div>

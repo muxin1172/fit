@@ -254,7 +254,7 @@ async function ensureGifs(){if(exerciseDatabase || gifError)return;if(gifsLoadin
 function mediaUrl(path){if(!path)return '';if(/^https?:\/\//.test(path))return path;return EXERCISES_ROOT+String(path).replace(/^\.\//,'').replace(/^\//,'');}
 
 let draftSets=[];
-const blankSet=()=>({weight:'',reps:'',failureAt:'',formBreakAt:'',unit:'lb',plus:false,verified:true});
+const blankSet=()=>({weight:'',reps:'',failureAt:'',formBreakAt:'',unit:'lb',duration:'',plus:false,verified:true});
 function initFormFields(){document.querySelector('#trainMuscle').innerHTML=MUSCLE_NAMES.map(m=>`<option>${m}</option>`).join('');}
 function renderSetRows(){
  // 逐组作为独立卡片：主要输入重量和重复次数，右侧保留动作质量监测。
@@ -263,7 +263,7 @@ function renderSetRows(){
   <div class="set-fields">
     <div class="field"><label>重量</label><input type="number" min="0" step="0.1" inputmode="decimal" placeholder="例如 35" data-field="weight" value="${h(s.weight??'')}"></div>
     <div class="field"><label>重复次数</label><input type="number" min="1" max="999" step="${typeof s.reps==='number' && !Number.isInteger(s.reps)?'any':'1'}" placeholder="例如 10" data-field="reps" value="${h(s.reps??'')}"></div>
-    <div class="field optional"><label>第几次力竭 <small>选填</small></label><input type="number" min="1" max="999" step="1" placeholder="—" data-field="failureAt" value="${h(s.failureAt??'')}"></div>
+    <div class="field"><label>时长（秒，选填）</label><input type="number" min="1" data-field="duration" value="${h(s.duration??'')}"></div><div class="field optional"><label>第几次力竭 <small>选填</small></label><input type="number" min="1" max="999" step="1" placeholder="—" data-field="failureAt" value="${h(s.failureAt??'')}"></div>
     <div class="field optional"><label>第几次变形 <small>选填</small></label><input type="number" min="1" max="999" step="1" placeholder="—" data-field="formBreakAt" value="${h(s.formBreakAt??'')}"></div>
   </div>
   <div class="set-bottom"><label>重量单位 <select data-unit="${i}"><option value="lb" ${s.unit==='lb'?'selected':''}>lb</option><option value="kg" ${s.unit==='kg'?'selected':''}>kg</option><option value="片" ${s.unit==='片'?'selected':''}>片</option><option value="" ${!s.unit?'selected':''}>未标明</option></select></label><label><input type="checkbox" data-plus="${i}" ${s.plus?'checked':''}> 重量带 +</label>${s.verified===false?'<span style="color:#ffc290">旧重量，组数待确认</span>':''}</div>
@@ -288,9 +288,9 @@ function openEditor(id=null,muscle=selectedRegion,name=''){
 document.querySelector('#cancelEdit').onclick=()=>{editingId=null;openEditor(null,document.querySelector('#trainMuscle').value);toast('表单已清空');};
 document.querySelector('#trainingForm').addEventListener('submit',e=>{e.preventDefault();const name=document.querySelector('#trainName').value.trim(), date=document.querySelector('#trainDate').value,muscle=document.querySelector('#trainMuscle').value;const old=records.find(x=>x.id===editingId);
  if(!name||(!date&&(!old||old.date)))return toast('请填写训练日期和动作名称',true);
- const sets=draftSets.map(s=>({...s,weight:s.weight===''?null:+s.weight,reps:s.reps===''?null:+s.reps,failureAt:s.failureAt===''?null:+s.failureAt,formBreakAt:s.formBreakAt===''?null:+s.formBreakAt,unit:s.unit||'',plus:!!s.plus,verified:s.verified!==false,
+ const sets=draftSets.map(s=>({...s,duration:s.duration===''||s.duration==null?null:+s.duration,weight:s.weight===''?null:+s.weight,reps:s.reps===''?null:+s.reps,failureAt:s.failureAt===''?null:+s.failureAt,formBreakAt:s.formBreakAt===''?null:+s.formBreakAt,unit:s.unit||'',plus:!!s.plus,verified:s.verified!==false,
   weightText:s.weight===''?s.weightText:undefined,repsText:s.reps===''?s.repsText:undefined}));
- for(let i=0;i<sets.length;i++){const s=sets[i];if([s.weight,s.reps,s.failureAt,s.formBreakAt].some(x=>x!==null&&(!Number.isFinite(x)||x<0)))return toast(`第 ${i+1} 组有无效数值`,true);if(s.reps!==null&&(s.reps<1||s.reps>999))return toast(`第 ${i+1} 组次数须在 1 至 999 之间`,true);if([s.failureAt,s.formBreakAt].some(x=>x!==null&&(!Number.isInteger(x)||x<1)))return toast(`第 ${i+1} 组力竭/变形次数须为正整数`,true);if(s.reps!==null&&((s.failureAt!==null&&s.failureAt>s.reps)||(s.formBreakAt!==null&&s.formBreakAt>s.reps)))return toast(`第 ${i+1} 组力竭/变形次数不能超过已完成次数`,true);}
+ for(let i=0;i<sets.length;i++){const s=sets[i];if([s.weight,s.reps,s.duration,s.failureAt,s.formBreakAt].some(x=>x!==null&&(!Number.isFinite(x)||x<0)))return toast(`第 ${i+1} 组有无效数值`,true);if(s.duration!==null&&s.duration<=0)return toast(`第 ${i+1} 组时长须为正数`,true);if(!old&&s.reps===null&&s.duration===null)return toast(`第 ${i+1} 组请填写次数或时长`,true);if(s.reps!==null&&(s.reps<1||s.reps>999))return toast(`第 ${i+1} 组次数须在 1 至 999 之间`,true);if([s.failureAt,s.formBreakAt].some(x=>x!==null&&(!Number.isInteger(x)||x<1)))return toast(`第 ${i+1} 组力竭/变形次数须为正整数`,true);if(s.reps!==null&&((s.failureAt!==null&&s.failureAt>s.reps)||(s.formBreakAt!==null&&s.formBreakAt>s.reps)))return toast(`第 ${i+1} 组力竭/变形次数不能超过已完成次数`,true);}
  const item={...old,id:editingId||UID(),date:date||null,muscle,name,sets,legacy:!!old?.legacy && sets.every(s=>!s.verified),quickEntry:old?.quickEntry===true,recentV4:old?.recentV4===true||!editingId,notes:document.querySelector('#trainNotes').value.trim(),createdAt:old?.createdAt||Date.now()};
  if(old){records=records.map(x=>x.id===editingId?item:x);}else records.push(item);try{saveRecords();}catch{toast('浏览器空间不足，保存失败',true);return;}editingId=null;toast('训练已保存 · 已更新历史与日历');renderDashboard();renderHistory();renderCalendar();closeOverlay('advancedOverlay');refreshQuickHome();
 });
@@ -440,7 +440,7 @@ const TREND_SETS=[
  {name:'第 2 组',color:'#a8b5ff',dash:'8 4'},
  {name:'第 3 组',color:'#ffd093',dash:'2 4'}
 ];
-const TREND_METRICS={weight:'重量',reps:'次数',volume:'训练量'};
+const TREND_METRICS={weight:'重量',reps:'次数',duration:'时长（秒）',volume:'训练量'};
 const trendUnitName=unit=>unit||'未标单位';
 const TREND_UNIT_ORDER=['kg','lb','片',''];
 let selectedTrendAction='',selectedTrendUnit=null,trendPickerMuscle='全部';
@@ -489,6 +489,7 @@ function numericSetValue(value) {
  return value===undefined||value===null||value===''||!Number.isFinite(+value)?null:+value;
 }
 function trendSetValue(set,metric,unit) {
+ if(metric==='duration')return numericSetValue(set.duration);
  if (!set) return null;
  const rawReps=numericSetValue(set.reps);
  const reps=rawReps!==null&&rawReps>0?rawReps:null;
@@ -1056,8 +1057,8 @@ function workoutGroupsForDate(date, sourceRecords=records){
   .map(([muscle,group])=>({muscle,actions:[...group.values()]}));
 }
 function quickSetText(set){
- const weight=set?.weight!==null&&set?.weight!==undefined&&set.weight!==''?`${set.weight}${set.plus?'+':''}${set.unit?' '+set.unit:''}`:(set?.weightText||'—');
- const reps=set?.reps!==null&&set?.reps!==undefined&&set.reps!==''?`${set.reps} 次`:(set?.repsText||'—');
+ const weight=set?.weight!==null&&set?.weight!==undefined&&set.weight!==''?`${set.weight}${set.plus?'+':''}${set.unit?' '+set.unit:''}`:(set?.weightText||'自重');
+ const reps=set?.duration>0?`${set.duration} 秒`:set?.reps!==null&&set?.reps!==undefined&&set.reps!==''?`${set.reps} 次`:(set?.repsText||'—');
  return `${h(weight)} <em>×</em> ${h(reps)}`;
 }
 function renderQuickDayGroups(date,hostId){
@@ -1191,11 +1192,12 @@ document.getElementById('quickAdvanced').addEventListener('click',()=>{
 document.getElementById('quickForm').addEventListener('submit',e=>{
  e.preventDefault();
  const name=document.getElementById('quickAction').value.trim(),date=document.getElementById('quickDate').value,muscle=document.getElementById('quickMuscle').value;
+ const durationValue=document.getElementById('quickDuration').value;const duration=durationValue===''?null:+durationValue;
  const w=document.getElementById('quickWeight').value,reps=document.getElementById('quickReps').value,unit=document.getElementById('quickUnit').value;
- if(!name||!date||w===''||reps==='')return toast('请填写动作、重量和次数',true);
- const weight=+w,rep=+reps;
- if(!Number.isFinite(weight)||weight<0||!Number.isInteger(rep)||rep<1||rep>999)return toast('重量应为非负数，次数应为正整数',true);
- const s={id:UID(),weight,reps:rep,unit,plus:false,failureAt:null,formBreakAt:null,verified:true};
+ if(!name||!date||(reps===''&&duration===null))return toast('请填写动作、日期和次数或时长',true);
+ const weight=w===''?null:+w,rep=reps===''?null:+reps;
+ if((weight!==null&&(!Number.isFinite(weight)||weight<0))||(rep!==null&&(!Number.isInteger(rep)||rep<1||rep>999))||(duration!==null&&(!Number.isFinite(duration)||duration<=0)))return toast('重量应为非负数，次数应为正整数',true);
+ const s={id:UID(),weight,reps:rep,duration,unit,plus:false,failureAt:null,formBreakAt:null,verified:true};
  saveQuickUnit();
  const existing=[...records].reverse().find(r=>r.quickEntry===true&&r.date===date&&r.name===name&&r.muscle===muscle);
  if(existing){existing.sets.push(s);}else{records.push({id:UID(),date,name,muscle,sets:[s],legacy:false,quickEntry:true,recentV4:true,notes:'',createdAt:Date.now()});}
