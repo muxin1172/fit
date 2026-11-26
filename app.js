@@ -304,13 +304,22 @@ const CHART_COLORS=['#8de4c8','#8aa9f4','#edba83','#cb9de3','#6dcdbd','#efa1b0',
 function datedRecords(){return records.filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(String(r.date||''))&&r.date<=today());}
 function chartMonday(d){const copy=new Date(d.getFullYear(),d.getMonth(),d.getDate(),12);copy.setDate(copy.getDate()-(copy.getDay()+6)%7);return copy;}
 function fmtNum(n){return Number(n.toFixed(1)).toString();}
+function isTrainingDay(day){return !!checkins[day]?.completed||records.some(r=>r.date===day&&(r.sets||[]).some(s=>s.verified!==false));}
+function trainingDays(){return [...new Set([...records.filter(r=>(r.sets||[]).some(s=>s.verified!==false)).map(r=>r.date),...Object.keys(checkins).filter(d=>checkins[d]?.completed)])].filter(d=>d&&d<=today()).sort();}
+function showFinishTraining(){
+ const day=document.getElementById('quickDate').value||today(),items=records.filter(r=>r.date===day);const sets=items.flatMap(r=>(r.sets||[]).filter(s=>s.verified!==false));
+ const volume={};for(const s of sets)if(Number.isFinite(s.weight)&&Number.isFinite(s.reps)&&!s.plus)volume[s.unit||'未标单位']=(volume[s.unit||'未标单位']||0)+s.weight*s.reps;
+ let summary=document.getElementById('finishSummary');if(!summary){summary=document.createElement('p');summary.id='finishSummary';document.getElementById('quickPhotoForm').prepend(summary);}
+ summary.textContent=`${dateLabel(day)} · ${new Set(items.map(r=>r.muscle+'|'+r.name)).size} 个动作 · ${sets.length} 组 · 总训练量 ${Object.entries(volume).map(([u,n])=>fmtNum(n)+' '+u+'×次').join(' / ')||'—'} · ${sets.filter(s=>s.pr).length} 个 PR`;
+ document.getElementById('quickCheckinDialogTitle').textContent='结束训练';document.getElementById('quickSavePhoto').textContent='保存训练小结';openOverlay('quickCheckinOverlay');
+}
 function renderAnalytics(){
  const base=chartMonday(new Date());const activity=[];
  // “活跃日”同时包含训练日期和明确完成的打卡日期，避免打卡后图表不更新。
  // 同一天兼有训练与打卡只计一次，不改变独立的肌群分布统计。
  const dates=new Set([...datedRecords().map(r=>r.date),...Object.entries(checkins).filter(([d,c])=>d<=today()&&c?.completed).map(([d])=>d)]);
- const checkinDays=Object.entries(checkins).filter(([d,c])=>d<=today()&&c?.completed).length;
- const pulse=document.querySelector('#historyCheckinPulse');if(pulse){const today=!!checkins[today()]?.completed;pulse.innerHTML=`<span class="history-sync-dot ${today?'complete':''}"></span>${today?'今天已打卡':'今天未打卡'}<span class="history-sync-sep">·</span>累计 ${checkinDays} 个打卡日`;}
+ const checkinDays=trainingDays().length;
+ const pulse=document.querySelector('#historyCheckinPulse');if(pulse){const trainedToday=isTrainingDay(today());pulse.innerHTML=`<span class="history-sync-dot ${trainedToday?'complete':''}"></span>${trainedToday?'今天已训练':'今天未训练'}<span class="history-sync-sep">·</span>累计 ${checkinDays} 个训练日`;}
 
  for(let i=11;i>=0;i--){const monday=new Date(base);monday.setDate(base.getDate()-i*7);const end=new Date(monday);end.setDate(monday.getDate()+6);
   const start=localISO(monday),last=localISO(end),n=[...dates].filter(d=>d>=start&&d<=last).length;
@@ -676,7 +685,7 @@ function renderCalendar(){
  document.querySelector('#checkinStats').innerHTML=`<div class="checkin-metric"><b>${dayCount}</b><small>本月活跃日</small></div><div class="checkin-metric"><b>${monthlyRecords.reduce((n,r)=>n+(r.sets||[]).filter(st=>st&&st.verified===true).length,0)}</b><small>确认训练组数</small></div><div class="checkin-metric"><b>${photoDays}</b><small>有照片的日期</small></div>`;
  for(let k=0;k<Math.ceil((start+length)/7)*7;k++){
   const day=k-start+1;if(day<1||day>length){markup+='<span class="cal-day muted" aria-hidden="true"></span>';continue;}
-  const date=`${monthPrefix}-${pad(day)}`,cnt=monthlyRecords.filter(r=>r.date===date).length,ch=checkins[date],checked=!!ch?.completed,photos=(ch?.photos||[]).length;
+  const date=`${monthPrefix}-${pad(day)}`,cnt=monthlyRecords.filter(r=>r.date===date).length,ch=checkins[date],checked=isTrainingDay(date),photos=(ch?.photos||[]).length;
   const daySets=monthlyRecords.filter(r=>r.date===date).reduce((n,r)=>n+(r.sets||[]).filter(st=>st&&st.verified===true).length,0);
   const level=daySets>=5?3:daySets>=2?2:cnt||checked?1:0;
   markup+=`<button type="button" data-day="${date}" class="cal-day level-${level} ${date===today()?'today':''} ${date===activeDay?'selected':''}" title="${date}：${cnt} 项动作${checked?' · 已打卡':''}${photos?' · '+photos+' 张照片':''}"><span class="cal-number">${day}</span><span class="cal-day-flags">${checked?'<span class="cal-check" aria-label="已打卡">✓</span>':''}${photos?'<span class="cal-photo" aria-label="有照片">▣</span>':''}</span><span class="cal-day-bottom">${daySets?`<span class="cal-count">${daySets} 组</span>`:(cnt?`<span class="cal-count">有记录</span>`:'')}</span></button>`;
@@ -1153,12 +1162,12 @@ function refreshQuickHome(){
  document.getElementById('quickLogCount').textContent=`${count} 组`;
  renderQuickDayGroups(date,'quickTodayList');
  renderLastWorkout();
- const ch=checkins[date]||{};const done=!!ch.completed;
+ const ch=checkins[date]||{};const done=isTrainingDay(date);
  document.querySelector('.quick-checkin').classList.toggle('is-complete',done);
- document.getElementById('quickCheckinTitle').textContent=done?'已完成打卡':'完成打卡';
+ document.getElementById('quickCheckinTitle').textContent=done?'训练日已记录':'结束训练';
  document.getElementById('quickCheckinSub').textContent=done?(ch.photos?.length?`${ch.photos.length} 张照片 · 已保存`:'打卡已保存'):'训练完成后点击打卡';
- document.getElementById('quickCheckinBtn').textContent=done?'✓ 已打卡':'✓ 打卡';
- document.getElementById('quickCheckinBtn').disabled=done;
+ document.getElementById('quickCheckinBtn').textContent=ch.finished?'查看训练小结':'结束训练';
+ document.getElementById('quickCheckinBtn').disabled=false;
  fillQuickActionSuggestions();
 }
 function syncTrainingViews(){
@@ -1276,13 +1285,7 @@ function celebrateCheckin(){
   frame=requestAnimationFrame(draw);
 }
 
-document.getElementById('quickCheckinBtn').addEventListener('click',()=>{
- const day=document.getElementById('quickDate').value||today(),old=checkins[day]||{notes:[],photos:[]};
- if(old.completed)return;
- checkins[day]={...old,completed:true};
- try{saveCheckins();}catch(e){return toast('打卡未保存，请检查本地存储',true);}
- syncTrainingViews();celebrateCheckin();toast('已完成当日打卡');
-});
+document.getElementById('quickCheckinBtn').addEventListener('click',showFinishTraining);
 let quickPhotoFiles=[],quickPhotoUrls=[];
 function renderQuickPhotoPreviews(){
  quickPhotoUrls.forEach(url=>URL.revokeObjectURL(url));quickPhotoUrls=[];
@@ -1307,10 +1310,10 @@ document.getElementById('quickPhotoForm').addEventListener('submit',async e=>{
  try{
   for(const file of quickPhotoFiles){const id=UID();await imagePut(id,file);photos.push(id);}
   const old=checkins[day]||{notes:[],photos:[]};
-  checkins[day]={completed:true,notes:[...(old.notes||[]),...(note?[{id:UID(),text:note,time:Date.now()}]:[])],photos:[...(old.photos||[]),...photos]};
+  checkins[day]={...old,completed:true,finished:true,notes:[...(old.notes||[]),...(note?[{id:UID(),text:note,time:Date.now()}]:[])],photos:[...(old.photos||[]),...photos]};
   saveCheckins();
   quickPhotoFiles=[];document.getElementById('quickNote').value='';renderQuickPhotoPreviews();
-  syncTrainingViews();closeOverlay('quickCheckinOverlay');if(!old.completed)celebrateCheckin();toast('照片与打卡已保存');
+  syncTrainingViews();closeOverlay('quickCheckinOverlay');if(!old.finished)celebrateCheckin();toast('训练小结已保存');
  }catch(err){for(const id of photos)await imageDelete(id).catch(()=>{});toast('照片保存失败：'+(err.message||err),true);}
  finally{btn.disabled=false;}
 });
