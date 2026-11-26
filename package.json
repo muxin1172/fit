@@ -2,6 +2,6 @@
   "name": "motionlog",
   "version": "15.0.0",
   "private": true,
-  "scripts": {"test": "node --test tests/*.test.cjs sync-core.test.js"},
+  "scripts": {"test": "node --test tests/*.test.cjs sync-core.test.js", "build": "node scripts/prepare-publish.mjs"},
   "devDependencies": {"jsdom": "26.1.0"}
 }
