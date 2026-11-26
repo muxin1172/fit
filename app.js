@@ -189,7 +189,30 @@ let saveCheckins=()=>localStorage.setItem(CHECKIN_KEY,JSON.stringify(checkins));
 const getLoad=rec=>Array.isArray(rec.sets)?rec.sets.filter(s=>s.weight!==null&&s.weight!==''&&Number.isFinite(+s.weight)).map(s=>`${s.weight}${s.plus?'+':''}${s.unit?' '+s.unit:''}`).join(' / '):'';
 const dateLabel=date=>date?`${date.slice(5,7)}/${date.slice(8,10)}/${date.slice(0,4)}`:'日期未注明';
 const byDate=(a,b,desc=true)=>(desc?-1:1)*(String(a.date||'0000').localeCompare(String(b.date||'0000')) || (Number(a.createdAt)||0)-(Number(b.createdAt)||0));
-function toast(msg,isError=false){const e=document.querySelector('#toast');e.textContent=msg;e.style.background=isError?'#ffe0e2':'#d2faea';e.classList.add('visible');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('visible'),3400);}
+function toast(msg,isError=false,undo=null){
+ const e=document.querySelector('#toast');e.replaceChildren();e.setAttribute('role','status');e.dataset.error=String(isError);e.append(document.createTextNode(msg));
+ if(undo){const b=document.createElement('button');b.type='button';b.textContent='撤销';b.onclick=()=>{clearTimeout(toast.t);undo();e.classList.remove('visible');};e.append(b);}
+ e.classList.add('visible');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('visible'),undo?5000:3400);
+}
+function requestConfirmation(message,onConfirm){
+ document.getElementById('inlineConfirmation')?.remove();
+ const bar=document.createElement('div');bar.id='inlineConfirmation';bar.className='inline-confirmation';bar.setAttribute('role','alertdialog');bar.setAttribute('aria-label',message);
+ const text=document.createElement('span');text.textContent=message;bar.append(text);
+ const yes=document.createElement('button');yes.textContent='确认删除';yes.className='btn btn-danger';yes.onclick=()=>{bar.remove();onConfirm();};
+ const no=document.createElement('button');no.textContent='取消';no.className='btn';no.onclick=()=>bar.remove();bar.append(yes,no);
+ (document.querySelector('.ml-overlay:not([hidden]) .ml-dialog')||document.body).append(bar);no.focus({preventScroll:true});
+}
+function removeTrainingRecord(id,setIndex=null){
+ const record=records.find(r=>r.id===id);if(!record)return;
+ requestConfirmation(setIndex===null?'删除这条训练记录？':'删除这一组？',()=>{
+  const current=records.find(r=>r.id===id);if(!current)return;
+  const original=structuredClone(current);let removedSet=null;
+  if(setIndex===null){records=records.filter(r=>r.id!==id);}else{removedSet=current.sets.splice(setIndex,1)[0];if(!current.sets.length)records=records.filter(r=>r.id!==id);}
+  saveRecords();if(editingId===id)closeOverlay('advancedOverlay');syncTrainingViews();
+  toast('训练已删除',false,()=>{const existing=records.find(r=>r.id===id);if(removedSet&&existing)existing.sets.splice(Math.min(setIndex,existing.sets.length),0,removedSet);else if(!existing)records.push(original);saveRecords();syncTrainingViews();});
+ });
+}
+
 
 /* ================== 模块 B：模块切换、概览与统计 ================== */
 let selectedRegion='背部', selectedAction='', editingId=null;
@@ -253,7 +276,7 @@ function renderSetRows(){
 const setRows=document.querySelector('#setRows');setRows.addEventListener('input',e=>{const row=e.target.closest('[data-i]');if(!row)return;const s=draftSets[+row.dataset.i];if(e.target.dataset.field!==undefined)s[e.target.dataset.field]=e.target.value;});setRows.addEventListener('change',e=>{if(e.target.dataset.unit!==undefined)draftSets[+e.target.dataset.unit].unit=e.target.value;if(e.target.dataset.plus!==undefined)draftSets[+e.target.dataset.plus].plus=e.target.checked;});setRows.addEventListener('click',e=>{const b=e.target.closest('[data-del]');if(!b){const cp=e.target.closest('[data-copy]');if(cp){const i=+cp.dataset.copy;if(i>0){draftSets[i].weight=draftSets[i-1].weight;draftSets[i].weightText=draftSets[i-1].weightText;draftSets[i].unit=draftSets[i-1].unit;renderSetRows();}}return;}if(draftSets.length<=1)return toast('至少保留一组；未知信息可以留空',true);draftSets.splice(+b.dataset.del,1);renderSetRows();});
 document.querySelector('#addSet').addEventListener('click',()=>{const prev=draftSets.at(-1);draftSets.push({...blankSet(),weight:prev?.weight??'',weightText:prev?.weightText,unit:prev?.unit??'lb'});renderSetRows();});
 function openEditor(id=null,muscle=selectedRegion,name=''){
- const r=id?records.find(x=>x.id===id):null;editingId=r?r.id:null;
+ const r=id?records.find(x=>x.id===id):null;editingId=r?r.id:null;document.getElementById('deleteRecord').hidden=!r;
  document.querySelector('#formTitle').textContent=r?'编辑训练记录':'记录一次训练';const dateInput=document.querySelector('#trainDate');dateInput.value=r?(r.date||''):TODAY;dateInput.required=!(r&&!r.date);
  document.querySelector('#trainMuscle').value=r?.muscle||muscle;
  document.querySelector('#trainName').value=r?.name||name;
@@ -330,7 +353,7 @@ function renderHistoryAction(action,showName) {
    set.formBreakAt>0?`第 ${h(set.formBreakAt)} 次变形`:'',
    h(set.note)
   ].filter(Boolean).join(' · ');
-  return `<div class="history-set-row"><span class="history-set-num">${label}</span><strong>${quickSetText(set)}</strong>${extras?`<small>${extras}</small>`:''}<button type="button" data-edit="${h(recordId)}">编辑</button></div>`;
+  return `<div class="history-set-row"><span class="history-set-num">${label}</span><strong>${quickSetText(set)}</strong>${extras?`<small>${extras}</small>`:''}<button type="button" data-edit="${h(recordId)}">编辑</button><button type="button" data-remove="${h(recordId)}" class="btn-danger">删除</button></div>`;
  }).join('');
  const notes=action.records.filter(record=>record.notes).map(record=>`<div class="history-set-note">${h(record.notes)}</div>`).join('');
  return `<div class="history-action-panel"><div class="history-action-title">${showName?`<strong>${h(action.name)}</strong>`:''}<span>${ordinal?`${ordinal} 组`:'组数未注明'}</span></div>${details||'<div class="history-set-note">暂无逐组数据</div>'}${notes}</div>`;
@@ -399,7 +422,8 @@ document.querySelector('#historyFilter').addEventListener('change',event=>{
  renderHistory();
 });
 document.querySelector('#historySort').addEventListener('change',renderHistory);
-document.querySelector('#historyList').addEventListener('click',e=>{const edit=e.target.closest('[data-edit]'),remove=e.target.closest('[data-remove]');if(edit)openEditor(edit.dataset.edit);if(remove){const r=records.find(x=>x.id===remove.dataset.remove);if(!r)return;if(!confirm(`删除 ${dateLabel(r.date)} 的「${r.name}」吗？此操作不可撤销。`))return;records=records.filter(x=>x.id!==r.id);saveRecords();syncTrainingViews();renderRecentActionChips();toast('已删除记录');}});
+document.querySelector('#historyList').addEventListener('click',e=>{const edit=e.target.closest('[data-edit]'),remove=e.target.closest('[data-remove]');if(edit)openEditor(edit.dataset.edit);if(remove)removeTrainingRecord(remove.dataset.remove);});
+
 
 /* ================== 模块 E.3：同动作的逐组趋势 ==================
    当前数据模型以日期为训练场次。同日同肌群同动作，按记录创建顺序及条目内组序拼接。
@@ -1035,7 +1059,7 @@ function renderQuickDayGroups(date,hostId){
  host.innerHTML=groups.map(group=>`<section class="day-muscle-group"><div class="day-muscle-title"><span class="muscle-accent"></span><h3>${h(group.muscle)}</h3><small>${group.actions.length} 个动作</small></div><div class="day-action-groups">${group.actions.map(action=>{
   const confirmed=action.sets.filter(x=>x.set.verified!==false).length;
   const label=confirmed?`${confirmed} 组`:'旧记录';
-  const rows=action.sets.map((part,i)=>`<div class="day-set-row"><span class="day-set-no">${part.legacy?'参考':`第 ${pad(action.sets.slice(0,i+1).filter(x=>!x.legacy).length)} 组`}</span><strong>${quickSetText(part.set)}</strong>${part.legacy?'<span class="day-set-legacy">组数不明</span>':''}<button type="button" data-quick-edit="${h(part.recordId)}" aria-label="编辑 ${h(action.name)} 第 ${i+1} 条记录">编辑</button></div>`).join('');
+  const rows=action.sets.map((part,i)=>`<div class="day-set-row"><span class="day-set-no">${part.legacy?'参考':`第 ${pad(action.sets.slice(0,i+1).filter(x=>!x.legacy).length)} 组`}</span><strong>${quickSetText(part.set)}</strong>${part.legacy?'<span class="day-set-legacy">组数不明</span>':''}<button type="button" data-quick-edit="${h(part.recordId)}" aria-label="编辑 ${h(action.name)} 第 ${i+1} 条记录">编辑</button><button type="button" data-remove-set="${h(part.recordId)}" data-set-index="${part.index}" aria-label="删除 ${h(action.name)} 第 ${i+1} 组">删除</button></div>`).join('');
   return `<div class="day-action-group"><div class="day-action-title"><strong>${h(action.name)}</strong><span>${label}</span></div><div class="day-set-list">${rows||'<div class="quick-empty">无组数据</div>'}</div></div>`;
  }).join('')}</div></section>`).join('');
 }
@@ -1164,15 +1188,15 @@ document.getElementById('quickForm').addEventListener('submit',e=>{
  if(!name||!date||w===''||reps==='')return toast('请填写动作、重量和次数',true);
  const weight=+w,rep=+reps;
  if(!Number.isFinite(weight)||weight<0||!Number.isInteger(rep)||rep<1||rep>999)return toast('重量应为非负数，次数应为正整数',true);
- const s={weight,reps:rep,unit,plus:false,failureAt:null,formBreakAt:null,verified:true};
+ const s={id:UID(),weight,reps:rep,unit,plus:false,failureAt:null,formBreakAt:null,verified:true};
  const existing=[...records].reverse().find(r=>r.quickEntry===true&&r.date===date&&r.name===name&&r.muscle===muscle);
  if(existing){existing.sets.push(s);}else{records.push({id:UID(),date,name,muscle,sets:[s],legacy:false,quickEntry:true,recentV4:true,notes:'',createdAt:Date.now()});}
  try{saveRecords();}catch(err){if(existing)existing.sets.pop();else records.pop();return toast('本地空间不足，训练未保存',true);}
  document.getElementById('quickWeight').value='';document.getElementById('quickReps').value='';
  syncTrainingViews();renderRecentActionChips();
- toast('已记录 1 组');document.getElementById('quickWeight').focus();
+ toast('已记录 1 组',false,()=>{for(const r of records)r.sets=r.sets.filter(set=>set.id!==s.id);records=records.filter(r=>r.sets.length);saveRecords();syncTrainingViews();});document.getElementById('quickWeight').focus();
 });
-document.getElementById('quickTodayList').addEventListener('click',e=>{const b=e.target.closest('[data-quick-edit]');if(b)openEditor(b.dataset.quickEdit);});
+document.getElementById('quickTodayList').addEventListener('click',e=>{const b=e.target.closest('[data-quick-edit]');if(b)openEditor(b.dataset.quickEdit);const del=e.target.closest('[data-remove-set]');if(del)removeTrainingRecord(del.dataset.removeSet,+del.dataset.setIndex);});
 document.getElementById('quickShowMap').addEventListener('click',()=>openOverlay('atlasOverlay'));
 document.getElementById('quickShowInsights').addEventListener('click',()=>{renderDashboard();openOverlay('insightsOverlay');});
 document.getElementById('quickGoHistory').addEventListener('click',()=>showView('history'));
@@ -1327,3 +1351,5 @@ document.querySelector('#heroDate').textContent=new Intl.DateTimeFormat('zh-CN',
 if (trainingNotesSaveFailed) toast('补录已显示，浏览器未能完成本地保存',true);
 // CDN 可能被浏览器扩展或离线环境阻断；超时后给出明确提示，而不是永久显示加载中。
 setTimeout(()=>{if(!document.querySelector('#threeHost canvas'))document.querySelector('#modelStatus').textContent='3D 渲染未启动：请联网后在 Chrome 中重新打开（Three.js 使用 CDN）。';},18000);
+
+document.getElementById('deleteRecord').addEventListener('click',()=>removeTrainingRecord(editingId));
