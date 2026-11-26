@@ -1176,9 +1176,9 @@ document.getElementById('quickForm').addEventListener('submit',e=>{
  const existing=[...records].reverse().find(r=>r.quickEntry===true&&r.date===date&&r.name===name&&r.muscle===muscle);
  if(existing){existing.sets.push(s);}else{records.push({id:UID(),date,name,muscle,sets:[s],legacy:false,quickEntry:true,recentV4:true,notes:'',createdAt:Date.now()});}
  try{saveRecords();}catch(err){if(existing)existing.sets.pop();else records.pop();return toast('本地空间不足，训练未保存',true);}
- document.getElementById('quickWeight').value='';document.getElementById('quickReps').value='';
+ 
  syncTrainingViews();renderRecentActionChips();
- toast('已记录 1 组',false,()=>{for(const r of records)r.sets=r.sets.filter(set=>set.id!==s.id);records=records.filter(r=>r.sets.length);saveRecords();syncTrainingViews();});document.getElementById('quickWeight').focus();
+ toast('已记录 1 组',false,()=>{for(const r of records)r.sets=r.sets.filter(set=>set.id!==s.id);records=records.filter(r=>r.sets.length);saveRecords();syncTrainingViews();});document.getElementById('quickReps').focus();document.getElementById('quickReps').select();
 });
 document.getElementById('quickTodayList').addEventListener('click',e=>{const b=e.target.closest('[data-quick-edit]');if(b)openEditor(b.dataset.quickEdit);const del=e.target.closest('[data-remove-set]');if(del)removeTrainingRecord(del.dataset.removeSet,+del.dataset.setIndex);});
 document.getElementById('quickShowInsights').addEventListener('click',()=>{renderDashboard();openOverlay('insightsOverlay');});
