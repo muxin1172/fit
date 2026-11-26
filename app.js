@@ -169,7 +169,8 @@ function renderAnalytics(){
  document.querySelector('#muscleOverviewChart').innerHTML=total?`<div class="muscle-donut" role="img" aria-label="已确认的肌群训练组数占比" style="background:conic-gradient(${segments.join(',')})"><div class="muscle-donut-hole"><span>${counts.length}<small>训练肌群</small></span></div></div><div class="muscle-legend">${counts.map((x,i)=>`<div class="muscle-legend-item" title="${h(x.name)}：${x.n} 条"><span class="muscle-legend-key"><i style="background:${CHART_COLORS[i%CHART_COLORS.length]}"></i>${h(x.name)}</span><span>${Math.round(x.n/total*100)}%</span></div>`).join('')}</div>`:`<div class="empty-state">暂时没有已确认的训练组。</div>`;
 }
 /* ================== 模块 E.2：训练记录的三个查看入口 ================== */
-let historyMode='date';
+let historyMode='date',historyDayLimit=20;
+const historyExpandedDays=new Map();
 const historyFilters={date:'',muscle:'',action:''};
 const historyLabels={date:'日期',muscle:'肌群',action:'动作'};
 const recordMuscle=record=>record.muscle||'未分类';
@@ -207,14 +208,15 @@ function renderHistoryDays(source,mode,sort) {
   if (b==='unknown') return -1;
   return sort==='old'?a.localeCompare(b):b.localeCompare(a);
  });
- return days.map(([date,items])=>{
+ return days.slice(0,historyDayLimit).map(([date,items],dayIndex)=>{
   const title=date==='unknown'?'未注明日期':dateLabel(date);
   // 同一日内沿用动作记录的先后顺序，组序与趋势图一致。
   const groups=workoutGroupsForDate(date==='unknown'?null:date,[...items].sort((a,b)=>byDate(a,b,false)));
   const body=groups.map(group=>`<section class="history-muscle-section">${mode==='date'?
    `<header class="history-muscle-title"><span class="muscle-accent"></span><h3>${h(group.muscle)}</h3><small>${group.actions.length} 个动作</small></header>`:''}
    ${group.actions.map(action=>renderHistoryAction(action,mode!=='action')).join('')}</section>`).join('');
-  return `<article class="session-day ${date==='unknown'?'unknown-day':''}"><header class="session-header"><div class="session-date">${h(title)}</div></header>${body}</article>`;
+  const summary=items.reduce((n,r)=>n+(r.sets||[]).filter(s=>s.verified!==false).length,0);const muscles=[...new Set(items.map(recordMuscle))].join('、');const open=historyExpandedDays.get(date)??dayIndex<2;
+  return `<details class="session-day ${date==='unknown'?'unknown-day':''}" data-history-day="${h(date)}" ${open?'open':''}><summary class="session-header"><span class="session-date">${h(title)}</span><span>${h(muscles)} · ${summary} 组</span></summary>${body}</details>`;
  }).join('');
 }
 function renderHistory() {
@@ -250,6 +252,7 @@ function renderHistory() {
    ${historyMode==='action'?`<button type="button" class="btn btn-small" data-rename-action="${h(recordAction(items[0]))}" data-rename-muscle="${h(recordMuscle(items[0]))}">重命名 / 合并到标准动作</button>`:''}${renderHistoryDays(items,historyMode,'new')}
   </section>`).join('');
  }
+ if(new Set(data.map(recordDateKey)).size>historyDayLimit)html+='<button class="btn" id="loadMoreDays" type="button">加载更多训练日</button>';
  document.querySelector('#historyList').innerHTML=html||'<div class="empty-state">暂无训练记录</div>';
  renderAnalytics();
  renderTrend();
@@ -1166,3 +1169,6 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDat
 document.getElementById('quickUnit').addEventListener('change',saveQuickUnit);
 
 document.getElementById('historyList').addEventListener('click',e=>{const b=e.target.closest('[data-rename-action]');if(!b)return;renameActionSource={name:b.dataset.renameAction,muscle:b.dataset.renameMuscle};catalogMuscle=renameActionSource.muscle;catalogEquip='全部';renderCatalog();openOverlay('pickerOverlay');void ensureGifs();});
+
+document.getElementById('historyList').addEventListener('click',e=>{if(e.target.closest('#loadMoreDays')){historyDayLimit+=20;renderHistory();}});
+document.getElementById('historyList').addEventListener('toggle',e=>{if(e.target.dataset?.historyDay)historyExpandedDays.set(e.target.dataset.historyDay,e.target.open);},true);
