@@ -285,7 +285,7 @@ function openEditor(id=null,muscle=selectedRegion,name=''){
  sourceName.textContent=sourceName.hidden?'':`原记动作：${r.sourceName}`;
  document.querySelector('#trainNotes').value=r?.notes||'';
  draftSets=r?(r.sets||[]).map(s=>({...s,weight:s.weight??'',reps:s.reps??'',failureAt:s.failureAt??'',formBreakAt:s.formBreakAt??'',unit:s.unit||'',plus:!!s.plus,verified:s.verified!==false})): [blankSet()];
- renderSetRows();const names=[...new Set(records.filter(x=>x.recentV4===true).map(x=>x.name))];document.querySelector('#recentActions').innerHTML=names.map(n=>`<option value="${h(n)}"></option>`).join('');showView('dashboard');catalogMuscle=document.querySelector('#trainMuscle').value;catalogEquip='全部';renderCatalog();renderRecentActionChips();initialEditorOpen=false;
+ renderSetRows();const names=[...new Set(records.filter(x=>x.recentV4===true).map(x=>x.name))];document.querySelector('#recentActions').innerHTML=names.map(n=>`<option value="${h(n)}"></option>`).join('');catalogMuscle=document.querySelector('#trainMuscle').value;catalogEquip='全部';renderCatalog();renderRecentActionChips();openOverlay('advancedOverlay');
 }
 document.querySelector('#cancelEdit').onclick=()=>{editingId=null;openEditor(null,document.querySelector('#trainMuscle').value);toast('表单已清空');};
 document.querySelector('#trainingForm').addEventListener('submit',e=>{e.preventDefault();const name=document.querySelector('#trainName').value.trim(), date=document.querySelector('#trainDate').value,muscle=document.querySelector('#trainMuscle').value;const old=records.find(x=>x.id===editingId);
@@ -294,7 +294,7 @@ document.querySelector('#trainingForm').addEventListener('submit',e=>{e.preventD
   weightText:s.weight===''?s.weightText:undefined,repsText:s.reps===''?s.repsText:undefined}));
  for(let i=0;i<sets.length;i++){const s=sets[i];if([s.weight,s.reps,s.failureAt,s.formBreakAt].some(x=>x!==null&&(!Number.isFinite(x)||x<0)))return toast(`第 ${i+1} 组有无效数值`,true);if(s.reps!==null&&(s.reps<1||s.reps>999))return toast(`第 ${i+1} 组次数须在 1 至 999 之间`,true);if([s.failureAt,s.formBreakAt].some(x=>x!==null&&(!Number.isInteger(x)||x<1)))return toast(`第 ${i+1} 组力竭/变形次数须为正整数`,true);if(s.reps!==null&&((s.failureAt!==null&&s.failureAt>s.reps)||(s.formBreakAt!==null&&s.formBreakAt>s.reps)))return toast(`第 ${i+1} 组力竭/变形次数不能超过已完成次数`,true);}
  const item={...old,id:editingId||UID(),date:date||null,muscle,name,sets,legacy:!!old?.legacy && sets.every(s=>!s.verified),quickEntry:old?.quickEntry===true,recentV4:old?.recentV4===true||!editingId,notes:document.querySelector('#trainNotes').value.trim(),createdAt:old?.createdAt||Date.now()};
- if(old){records=records.map(x=>x.id===editingId?item:x);}else records.push(item);try{saveRecords();}catch{toast('浏览器空间不足，保存失败',true);return;}editingId=null;toast('训练已保存 · 已更新历史与日历');renderDashboard();renderHistory();renderCalendar();originalOpenEditor(null,muscle);closeOverlay('advancedOverlay');refreshQuickHome();
+ if(old){records=records.map(x=>x.id===editingId?item:x);}else records.push(item);try{saveRecords();}catch{toast('浏览器空间不足，保存失败',true);return;}editingId=null;toast('训练已保存 · 已更新历史与日历');renderDashboard();renderHistory();renderCalendar();closeOverlay('advancedOverlay');refreshQuickHome();
 });
 
 /* ================== 模块 E：历史查询、编辑、删除、同单位趋势 ================== */
@@ -781,7 +781,7 @@ const ACTION_GROUPS={
   ['站姿提踵','Standing Calf Raise','器械'],['坐姿提踵','Seated Calf Raise','器械'],['腿举机提踵','Leg Press Calf Raise','器械'],['哑铃提踵','Dumbbell Calf Raise','哑铃'],['单腿提踵','Single-Leg Calf Raise','自重']]
 };
 const CATALOG=Object.entries(ACTION_GROUPS).flatMap(([muscle,items])=>items.map(([zh,en,equipment])=>({muscle,zh,en,equipment})));
-let catalogMuscle='背部',catalogEquip='全部',catalogSelected=null,initialEditorOpen=true;
+let catalogMuscle='背部',catalogEquip='全部',catalogSelected=null;
 const EQ_OPTIONS=['全部','器械','哑铃','训练凳','绳索','杠铃','自重'];
 function renderRecentActionChips(){
  // 从本版本开始新保存的训练才加入快捷入口；旧记录只在历史页展示。
@@ -969,6 +969,7 @@ function applyCatalogAction(zh){
  const a=CATALOG.find(x=>x.zh===zh);if(!a)return;
  catalogSelected=a;catalogMuscle=a.muscle;choosingCatalogGif=false;
  document.querySelector('#trainMuscle').value=a.muscle;document.querySelector('#trainName').value=a.zh;
+ document.getElementById('quickAction').value=a.zh;document.getElementById('quickMuscle').value=a.muscle;renderLastWorkout();
  renderCatalog();renderCatalogPreview();
  /* V6：表单隐藏于高级记录弹窗，选中后先预览 GIF，不转移焦点。 */
 }
@@ -1316,22 +1317,7 @@ document.getElementById('quickPhotoForm').addEventListener('submit',async e=>{
  }catch(err){for(const id of photos)await imageDelete(id).catch(()=>{});toast('照片保存失败：'+(err.message||err),true);}
  finally{btn.disabled=false;}
 });
-/* 将原来的详细编辑页改为弹窗入口，而非把完整表单插进首页。 */
-const originalOpenEditor=openEditor;
-openEditor=function(...args){
- const isInitial=initialEditorOpen;
- originalOpenEditor(...args);
- if(!isInitial)openOverlay('advancedOverlay');
-};
-/* 动作库仍能展示匹配 GIF，但选中后会同步到快速记录表单。 */
-const originalApplyCatalogAction=applyCatalogAction;
-applyCatalogAction=function(zh){
- originalApplyCatalogAction(zh);
- const a=CATALOG.find(x=>x.zh===zh);if(!a)return;
- document.getElementById('quickAction').value=a.zh;
- document.getElementById('quickMuscle').value=a.muscle;
- renderLastWorkout();
-};
+
 /* 点击动图展示卡的“继续记录”才结束浏览动作，防止无法观看预览。 */
 document.querySelector('#catalogPreview').addEventListener('click',e=>{
  if(e.target.closest('[data-use-selected]')){
@@ -1345,7 +1331,7 @@ refreshQuickHome();
 
 /* 页面初始化：先将 CRUD/旧记录功能启动；Three.js 使用另一个 ES module 加载 */
 initFormFields();document.querySelector('#clockDate').textContent=new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date());
-document.querySelector('#heroDate').textContent=new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric',weekday:'long'}).format(new Date());setRegion('背部');renderDashboard();renderHistory();document.querySelector('#checkinDate').value=TODAY;chooseDay(TODAY);catalogMuscle='背部';renderCatalog();renderRecentActionChips();openEditor(null,'背部');showView('dashboard');ensureGifs();
+document.querySelector('#heroDate').textContent=new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric',weekday:'long'}).format(new Date());setRegion('背部');renderDashboard();renderHistory();document.querySelector('#checkinDate').value=TODAY;chooseDay(TODAY);catalogMuscle='背部';renderCatalog();renderRecentActionChips();showView('dashboard');ensureGifs();
 if (trainingNotesSaveFailed) toast('补录已显示，浏览器未能完成本地保存',true);
 // CDN 可能被浏览器扩展或离线环境阻断；超时后给出明确提示，而不是永久显示加载中。
 setTimeout(()=>{if(!document.querySelector('#threeHost canvas'))document.querySelector('#modelStatus').textContent='3D 渲染未启动：请联网后在 Chrome 中重新打开（Three.js 使用 CDN）。';},18000);
