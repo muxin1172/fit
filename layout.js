@@ -119,7 +119,7 @@
     const status = $('#motion-sync-status');
     // Preserve the real controls and their handlers, including late auth changes.
     const toolbar = status?.closest('#motion-sync-toolbar, #motion-sync-bar, #motion-cloud-toolbar, .motion-sync-toolbar, .motion-sync-bar, [data-motion-sync-toolbar]');
-    move(toolbar || status, $('#syncStatus'));
+    move(toolbar || status, mobile.matches ? $('#syncStatus') : topActions);
     for (const id of ['motion-cloud-account', 'motion-sync-account', 'motion-sync-logout', 'motion-cloud-logout']) {
       const control = document.getElementById(id);
       if (control && !$('#syncStatus').contains(control)) move(control, $('#syncStatus'));

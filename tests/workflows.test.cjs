@@ -83,3 +83,7 @@ test('prefill keeps historical numeric weight and its unit together',()=>{
 test('advanced save failure restores the original record',()=>{
  const t=app([record()]);const initial=t.state().records;t.w.openEditor('r');t.$('trainName').value='变更名称';t.w.eval("saveRecords=()=>{throw Error('quota')}");t.submit('trainingForm');assert.deepEqual(t.state().records,initial);assert.equal(t.$('advancedOverlay').hidden,false);
 });
+test('GIF database loads only after the action picker is opened',async()=>{
+ const t=app();const requests=[];t.w.fetch=async url=>{requests.push(url);return {ok:true,json:async()=>[]};};assert.equal(requests.length,0);
+ t.$('openPicker').click();await t.w.ensureGifs();assert.equal(requests.length,1);assert.match(requests[0],/exercises\.json$/);
+});

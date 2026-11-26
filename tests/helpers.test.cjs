@@ -129,7 +129,8 @@ test('private and no-store responses are never added to the asset cache',async()
  }
 });
 test('activation prunes only obsolete caches owned by this worker',async()=>{
- const h=workerHarness({cacheNames:['foreign-app','motionlog-v15-shell-0','motionlog-v15-shell-1']});let pending;
+ const current=fs.readFileSync(root+'sw.js','utf8').match(/const VERSION = '([^']+)'/)[1];
+ const h=workerHarness({cacheNames:['foreign-app','motionlog-v15-shell-0',current]});let pending;
  h.events.activate({waitUntil(p){pending=p}});await pending;assert.deepEqual(h.deleted,['motionlog-v15-shell-0']);
 });
 test('navigation returns offline index for root and index.html without persisting query contents',async()=>{
