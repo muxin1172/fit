@@ -18,172 +18,8 @@ const isoDate = d=>d ? d : '日期未注明';
 const UID=()=> (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 const h = text=>String(text??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function readJSON(key,fallback){try{let s=localStorage.getItem(key);return s===null?fallback:JSON.parse(s);}catch{return fallback;}}
-/* ================== 模块 A.1：训练手记原始数据 ==================
-   格式：肌群、原动作名、整理后的动作名、逐组数据、动作备注。
-   每组为 [重量, 次数, 可选的单位、动作质量等信息]。六条旧手记未注明日期。
-   11 月 4 日前的手记只有重量参考；不推断组数。其余数字按原文逐组保存。 */
-const trainingNoteDays = [
- [null, [
-  ['肩部','飞鸟','肩部飞鸟（方向待确认）',[[17.5]]],
-  ['肩部','前束','前平举',[[20]]],
-  ['肩部','上举','肩上推举',[[20]]],
-  ['腹部','腹肌训练','腹部训练（动作待确认）',[[null]],'原始记录：20；未注明是次数还是重量，不作推断。'],
-  ['二头肌','侧提','肱二头肌训练（侧提，动作待确认）',[[22.5]]],
-  ['二头肌','单手 bench','训练凳辅助单臂肱二头肌弯举',[[20]]]
- ]],
- ['2026-10-26', [
-  ['胸部','躺举','仰卧推胸（器械待确认）',[[35]]],
-  ['三头肌','直杆','直杆下压',[[32.5]]],
-  ['三头肌','背拉','肱三头肌训练（背拉，动作待确认）',[[22.5]]],
-  ['三头肌','单手','单臂肱三头肌训练（动作待确认）',[[7.5]]]
- ]],
- ['2026-10-29', [
-  ['背部','高位下拉','高位下拉',[[120]]],
-  ['背部','划船','划船',[[100]]],
-  ['二头肌','侧提','肱二头肌训练（侧提，动作待确认）',[[20]]],
-  ['二头肌','单侧','单臂肱二头肌弯举',[[20]]]
- ]],
- ['2026-11-02', [
-  ['背部','下拉','高位下拉',[[120,null,{plus:true}]]],
-  ['背部','划船','划船',[[120]]],
-  ['背部','单手器械','单臂器械背部训练（动作待确认）',[[85],[100]],'原始记录中有 85、100 两个重量；未注明对应组数。'],
-  ['三头肌','rope','绳索下压',[[32.5]]],
-  ['三头肌','背拉','肱三头肌训练（背拉，动作待确认）',[[22.5]]],
-  ['三头肌','单手','单臂肱三头肌训练（动作待确认）',[[7.5,null,{plus:true}]]]
- ]],
- ['2026-11-04', [
-  ['肩部','飞鸟','肩部飞鸟（方向待确认）',[[17.5,12],[17.5,12],[20,8,{note:'原记（4），含义未注明'}]]],
-  ['肩部','前束','前平举',[[20,12],[20,12],[22.5,10]]],
-  ['肩部','上举','肩上推举',[[25,10],[25,10],[25,6]]],
-  ['背部','腰','下背部训练（动作待确认）',[[0,12],[null,12,{weightText:'中'}],[null,12,{weightText:'中'}]]]
- ]],
- ['2026-11-06', [
-  ['胸部','器材推胸','器械推胸',[[90,12],[100,10],[110,8]]],
-  ['胸部','哑铃推胸','哑铃卧推（角度未注明）',[[35,10],[35,8],[35,10]],'逐渐稳定了'],
-  ['胸部','器材夹胸','器械夹胸',[[85,8]],'', ['器械飞鸟','坐姿夹胸']],
-  ['二头肌','双手','双臂肱二头肌弯举',[[25,8,{formBreakAt:6,note:'5 后不标准'}],[25,6],[25,5]]],
-  ['二头肌','单手','单臂肱二头肌弯举',[[22.5,10],[22.5,10]]]
- ]],
- ['2026-11-12', [
-  ['背部','高位下拉','高位下拉',[[100,12],[120,12],[140,8]],'', ['下拉']],
-  ['背部','坐姿划船','坐姿划船',[[120,12],[140,8],[140,8]]],
-  ['背部','器械单手','单臂器械背部训练（动作待确认）',[[100,12]],'', ['单手器械']],
-  ['三头肌','直杆','直杆下压',[[42.5,12],[42.5,10],[42.5,8]]],
-  ['三头肌','rope背','绳索肱三头肌训练（rope 背，动作待确认）',[[27.5,11.5],[27.5,8],[22.5,12]]],
-  ['三头肌','单手','单臂肱三头肌训练（动作待确认）',[[12.5,3],[7.5,10],[7.5,8]]]
- ]],
- ['2026-11-16', [
-  ['胸部','器材推胸','器械推胸',[[100,12],[110,11],[110,8]]],
-  ['胸部','哑铃推胸','哑铃卧推（角度未注明）',[[35,12],[35,8],[35,6]]],
-  ['胸部','器材夹胸','器械夹胸',[[70,12],[85,8],[85,8]],'', ['器械飞鸟','坐姿夹胸']],
-  ['二头肌','双手','双臂肱二头肌弯举',[[25,7],[25,8],[25,6]],'更标准，行程长'],
-  ['二头肌','单手','单臂肱二头肌弯举',[[25,8],[25,8],[25,null,{repsText:'左 8 / 右 5'}]]],
-  ['背部','腰','下背部训练（动作待确认）',[[10,12],[35,12]]]
- ]],
- ['2026-11-17', [
-  ['腿部','倒蹬','腿举',[[90,10],[135,8],[135,6]]],
-  ['腿部','腿臀外展','器械髋外展',[[90,12],[105,12],[105,12]],'', ['髋外展']],
-  ['腿部','臀内收','器械髋内收',[[52.5,12],[60,12],[60,12]],'', ['髋内收']],
-  ['腹部','抬腿','举腿（姿势待确认）',[[25,10],[25,10],[0,10]],'', ['举腿']]
- ]],
- ['2026-11-19', [
-  ['背部','下拉','高位下拉',[[110,12],[130,10],[150,5]]],
-  ['背部','坐姿划船','坐姿划船',[[120,12],[140,12],[120,10]]],
-  ['背部','器械背夹','器械背部夹收（动作待确认）',[[7,6,{unit:'片'}],[7,5,{unit:'片'}],[6,9,{unit:'片'}]],'✅ 这个要多练'],
-  ['背部','单手背','单臂背部训练（动作待确认）',[[115,10]]],
-  ['三头肌','单手','单臂肱三头肌训练（动作待确认）',[[12.5,null,{repsText:'左 8 / 右 10'}],[12.5,6],[7.5,7]],'以后单手最后一个做'],
-  ['三头肌','rope','绳索下压',[[22.5,5],[22.5,8],[22.5,7]]],
-  ['三头肌','背拉','肱三头肌训练（背拉，动作待确认）',[[17.5,8],[17.5,8],[22.5,6]],'胸部再往下一格，向斜上方拉']
- ]]
-];
-const trainingNoteRows = trainingNoteDays.flatMap(([date, rows])=>rows.map(
- ([muscle,sourceName,name,groups,notes='',aliases=[]], index)=>{
-  const id = `training-notes-${date||'undated'}-${index+1}`;
-  const legacy = !date || date < '2026-11-04';
-  const sets = groups.map(([weight,reps=null,detail={}], setIndex)=>({
-   weight,reps,unit:'',plus:false,failureAt:null,formBreakAt:null,verified:!legacy,
-   ...detail,sourceSetId:`${id}-${setIndex+1}`
-  }));
-  return {record:{id,date,muscle,name,sourceName,sets,notes,legacy,createdAt:index+1},aliases};
- }
-));
-function seedHistory(){return trainingNoteRows.map(({record})=>structuredClone(record));}
-
-const normalizeNoteLabel = value=>String(value??'').trim().toLowerCase().replace(/\s+/g,'');
-function sameNoteSet(existing, source) {
- // 未记单位时允许匹配已注明单位的旧记录；双方明确的不同单位不可合并。
- const number = value=>value===null || value==='' || value===undefined ? null : Number(value);
- return (existing.verified!==false)===(source.verified!==false)
-  && number(existing.weight)===source.weight && number(existing.reps)===source.reps
-  && normalizeNoteLabel(existing.weightText)===normalizeNoteLabel(source.weightText)
-  && normalizeNoteLabel(existing.repsText)===normalizeNoteLabel(source.repsText)
-  && Boolean(existing.plus)===source.plus
-  && (!existing.unit || !source.unit || existing.unit===source.unit);
-}
-function appendTrainingNote(previous, note) {
- if (!note || (previous||'').split('\n').includes(note)) return previous;
- return [previous,note].filter(Boolean).join('\n');
-}
-function mergeTrainingNotes(current) {
- // 复制待补录的记录，原数组保留给页面或备份恢复流程使用。
- const result = structuredClone(current);
- const handledSetIds = new Set(result.flatMap(row=>(row.sets||[]).map(set=>set.sourceSetId).filter(Boolean)));
- let addedActions=0, addedSets=0;
- for (const {record:source,aliases} of trainingNoteRows) {
-  const labels = new Set([source.name,source.sourceName,...aliases].map(normalizeNoteLabel));
-  const matches = result.filter(row=>(row.date||null)===source.date && row.muscle===source.muscle &&
-   labels.has(normalizeNoteLabel(row.name)));
-  // 一条已有组只能对应手记中的一条，保留多组相同的重量与次数。
-  const candidates = matches.flatMap(row=>(row.sets||[]).filter(set=>!set.sourceSetId));
-  const missing = [];
-  for (const set of source.sets) {
-   if (handledSetIds.has(set.sourceSetId)) continue;
-   const index = candidates.findIndex(candidate=>sameNoteSet(candidate,set));
-   if (index<0) {
-    missing.push({...set});
-    if (set.verified) addedSets++;
-    continue;
-   }
-   const [match] = candidates.splice(index,1);
-   match.sourceSetId = set.sourceSetId;
-   if (!match.unit && set.unit) match.unit = set.unit;
-   if (match.formBreakAt==null || match.formBreakAt==='') match.formBreakAt = set.formBreakAt;
-   if (set.note) match.note = appendTrainingNote(match.note,set.note);
-   handledSetIds.add(set.sourceSetId);
-  }
-  for (const row of matches) {
-   if (normalizeNoteLabel(row.name)===normalizeNoteLabel(source.sourceName)) row.name=source.name;
-   if (!row.sourceName) row.sourceName=source.sourceName;
-  }
-  const destination = matches.at(-1);
-  if (destination) {
-   if (missing.length) destination.sets=[...(destination.sets||[]),...missing];
-   destination.notes=appendTrainingNote(destination.notes,source.notes);
-   if (missing.length && source.sets.some(set=>set.verified)) destination.legacy=false;
-  } else if (missing.length) {
-   result.push({...source,sets:missing});
-   addedActions++;
-  }
- }
- return {records:result,addedActions,addedSets};
-}
-// 旧版数据在页面首次启动时自动补录。标记只在记录写入后保存，避免刷新时恢复用户主动删除的数据。
-const TRAINING_NOTES_BATCH='2026-11-personal-training-notes';
-const TRAINING_NOTES_IMPORT_KEY='motionlog_training_notes_batch_v1';
-const markTrainingNotesImported=()=>localStorage.setItem(TRAINING_NOTES_IMPORT_KEY,JSON.stringify(TRAINING_NOTES_BATCH));
-const savedRecords=readJSON(STORAGE_KEY,null);
-let records=Array.isArray(savedRecords)?savedRecords:seedHistory();
+let records=readJSON(STORAGE_KEY,[]);if(!Array.isArray(records))records=[];
 let saveRecords=()=>localStorage.setItem(STORAGE_KEY,JSON.stringify(records));
-let trainingNotesSaveFailed=false;
-if (!Array.isArray(savedRecords) || readJSON(TRAINING_NOTES_IMPORT_KEY,null)!==TRAINING_NOTES_BATCH) {
- if (Array.isArray(savedRecords)) records=mergeTrainingNotes(savedRecords).records;
- try {
-  saveRecords();
-  markTrainingNotesImported();
- } catch {
-  trainingNotesSaveFailed=true;
- }
-}
 let checkins=readJSON(CHECKIN_KEY,{});if(!checkins || typeof checkins!=='object'||Array.isArray(checkins))checkins={};
 let saveCheckins=()=>localStorage.setItem(CHECKIN_KEY,JSON.stringify(checkins));
 const PREFERENCES_KEY='motionlog_preferences_v1';
@@ -713,26 +549,9 @@ document.querySelector('#dayDetails').addEventListener('click',async e=>{const n
 /* ================== 模块 G：完整备份（包含图片）与恢复 ================== */
 function blobAsDataURL(blob){return new Promise((resolve,reject)=>{const rd=new FileReader();rd.onload=()=>resolve(rd.result);rd.onerror=reject;rd.readAsDataURL(blob);});}
 async function exportData(){const b=document.querySelector('#exportBtn');b.disabled=true;b.textContent='正在准备备份…';try{const photoIds=[...new Set(Object.values(checkins).flatMap(ch=>ch.photos||[]))],images={};for(const id of photoIds){try{const blob=await imageGet(id);if(blob)images[id]=await blobAsDataURL(blob);}catch{}}
- const payload={app:'MotionLog',version:1,exportedAt:new Date().toISOString(),trainingNotesBatch:TRAINING_NOTES_BATCH,records,checkins,images,gifBindings};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`motionlog-backup-${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);toast('已生成完整 JSON 备份');}catch(e){toast('备份失败：'+e.message,true);}finally{b.disabled=false;b.textContent='导出备份';}}
+ const payload={app:'MotionLog',version:1,exportedAt:new Date().toISOString(),records,checkins,images,gifBindings};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`motionlog-backup-${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);toast('已生成完整 JSON 备份');}catch(e){toast('备份失败：'+e.message,true);}finally{b.disabled=false;b.textContent='导出备份';}}
 document.querySelector('#exportBtn').onclick=exportData;document.querySelector('#importBtn').onclick=()=>document.querySelector('#importFile').click();
-document.querySelector('#mergeTrainingNotes').onclick=()=>{
- // 优先使用本地最新数据，且只写入训练记录键，不操作打卡照片或备注。
- const saved=readJSON(STORAGE_KEY,records);
- const current=Array.isArray(saved)?saved:records;
- const merged=mergeTrainingNotes(current);
- const changed=JSON.stringify(current)!==JSON.stringify(merged.records);
- if (changed) {
-  try {localStorage.setItem(STORAGE_KEY,JSON.stringify(merged.records));}
-  catch {toast('浏览器存储空间不足，补录未保存',true);return;}
- }
- records=merged.records;
- syncTrainingViews();
- if (merged.addedActions || merged.addedSets) {
-  toast(`补录成功 · 新增 ${merged.addedActions} 条记录、${merged.addedSets} 个确认组`);
- } else {
-  toast(changed?'这批训练已齐全，动作名称已整理':'这批训练已齐全');
- }
-};
+
 function dataURLtoBlob(url){const [header,base64]=url.split(',');const type=header.match(/data:(.*?);base64/)?.[1]||'application/octet-stream';const raw=atob(base64),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return new Blob([bytes],{type});}
 document.querySelector('#importFile').addEventListener('change',async e=>{
  const file=e.target.files[0];
@@ -745,22 +564,22 @@ document.querySelector('#importFile').addEventListener('change',async e=>{
   }
   if (!confirm(`从备份恢复 ${backup.records.length} 条训练记录？将覆盖当前训练与打卡记录。`)) return;
   // 旧备份缺少补录标记，恢复前先合并。新版备份已记录本批导入状态，可保留用户的后续增删。
-  const imported=backup.trainingNotesBatch===TRAINING_NOTES_BATCH?null:mergeTrainingNotes(backup.records);
+  
   for (const [id,src] of Object.entries(backup.images||{})) {
    if (typeof src==='string'&&src.startsWith('data:')) await imagePut(id,dataURLtoBlob(src));
   }
-  records=imported?.records||backup.records;
+  records=backup.records;
   checkins=backup.checkins;
   saveRecords();
   saveCheckins();
-  markTrainingNotesImported();
+  
   if (backup.gifBindings&&typeof backup.gifBindings==='object'&&!Array.isArray(backup.gifBindings)) {
    gifBindings=backup.gifBindings;
    localStorage.setItem(GIF_BINDINGS_KEY,JSON.stringify(gifBindings));
    renderCatalogPreview();
   }
   syncTrainingViews();
-  toast(imported?.addedSets?`备份已恢复 · 自动补录 ${imported.addedSets} 组训练`:'备份已恢复');
+  toast('备份已恢复');
  } catch (err) {
   toast('导入失败：'+err.message,true);
  }
@@ -1335,7 +1154,6 @@ refreshQuickHome();
 /* 页面初始化：先将 CRUD/旧记录功能启动；Three.js 使用另一个 ES module 加载 */
 initFormFields();document.querySelector('#clockDate').textContent=new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date());
 document.querySelector('#heroDate').textContent=new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric',weekday:'long'}).format(new Date());renderDashboard();renderHistory();document.querySelector('#checkinDate').value=today();chooseDay(today());catalogMuscle='背部';renderCatalog();renderRecentActionChips();showView('dashboard');
-if (trainingNotesSaveFailed) toast('补录已显示，浏览器未能完成本地保存',true);
 // CDN 可能被浏览器扩展或离线环境阻断；超时后给出明确提示，而不是永久显示加载中。
 
 
