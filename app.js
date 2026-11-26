@@ -13,7 +13,7 @@ const MUSCLE_NAMES=Object.keys(REGIONS);
 const STORAGE_KEY='motionlog_records_v1', CHECKIN_KEY='motionlog_checkins_v1';
 const pad=n=>String(n).padStart(2,'0');
 function localISO(d=new Date()){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
-const TODAY=localISO();
+const today=()=>localISO();
 const isoDate = d=>d ? d : '日期未注明';
 const UID=()=> (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`);
 const h = text=>String(text??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -260,7 +260,7 @@ const setRows=document.querySelector('#setRows');setRows.addEventListener('input
 document.querySelector('#addSet').addEventListener('click',()=>{const prev=draftSets.at(-1);draftSets.push({...blankSet(),weight:prev?.weight??'',weightText:prev?.weightText,unit:prev?.unit??'lb'});renderSetRows();});
 function openEditor(id=null,muscle=selectedRegion,name=''){
  const r=id?records.find(x=>x.id===id):null;editingId=r?r.id:null;document.getElementById('deleteRecord').hidden=!r;
- document.querySelector('#formTitle').textContent=r?'编辑训练记录':'记录一次训练';const dateInput=document.querySelector('#trainDate');dateInput.value=r?(r.date||''):TODAY;dateInput.required=!(r&&!r.date);
+ document.querySelector('#formTitle').textContent=r?'编辑训练记录':'记录一次训练';const dateInput=document.querySelector('#trainDate');dateInput.value=r?(r.date||''):today();dateInput.required=!(r&&!r.date);
  document.querySelector('#trainMuscle').value=r?.muscle||muscle;
  document.querySelector('#trainName').value=r?.name||name;
  const sourceName=document.querySelector('#trainSourceName');
@@ -286,16 +286,16 @@ document.querySelector('#trainingForm').addEventListener('submit',e=>{e.preventD
    活跃日期及动作趋势只使用不晚于今天的已知日期。
    一周从周一开始，按真实训练日期去重统计训练天数。 */
 const CHART_COLORS=['#8de4c8','#8aa9f4','#edba83','#cb9de3','#6dcdbd','#efa1b0','#90bacd','#c5d487'];
-function datedRecords(){return records.filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(String(r.date||''))&&r.date<=TODAY);}
+function datedRecords(){return records.filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(String(r.date||''))&&r.date<=today());}
 function chartMonday(d){const copy=new Date(d.getFullYear(),d.getMonth(),d.getDate(),12);copy.setDate(copy.getDate()-(copy.getDay()+6)%7);return copy;}
 function fmtNum(n){return Number(n.toFixed(1)).toString();}
 function renderAnalytics(){
  const base=chartMonday(new Date());const activity=[];
  // “活跃日”同时包含训练日期和明确完成的打卡日期，避免打卡后图表不更新。
  // 同一天兼有训练与打卡只计一次，不改变独立的肌群分布统计。
- const dates=new Set([...datedRecords().map(r=>r.date),...Object.entries(checkins).filter(([d,c])=>d<=TODAY&&c?.completed).map(([d])=>d)]);
- const checkinDays=Object.entries(checkins).filter(([d,c])=>d<=TODAY&&c?.completed).length;
- const pulse=document.querySelector('#historyCheckinPulse');if(pulse){const today=!!checkins[TODAY]?.completed;pulse.innerHTML=`<span class="history-sync-dot ${today?'complete':''}"></span>${today?'今天已打卡':'今天未打卡'}<span class="history-sync-sep">·</span>累计 ${checkinDays} 个打卡日`;}
+ const dates=new Set([...datedRecords().map(r=>r.date),...Object.entries(checkins).filter(([d,c])=>d<=today()&&c?.completed).map(([d])=>d)]);
+ const checkinDays=Object.entries(checkins).filter(([d,c])=>d<=today()&&c?.completed).length;
+ const pulse=document.querySelector('#historyCheckinPulse');if(pulse){const today=!!checkins[today()]?.completed;pulse.innerHTML=`<span class="history-sync-dot ${today?'complete':''}"></span>${today?'今天已打卡':'今天未打卡'}<span class="history-sync-sep">·</span>累计 ${checkinDays} 个打卡日`;}
 
  for(let i=11;i>=0;i--){const monday=new Date(base);monday.setDate(base.getDate()-i*7);const end=new Date(monday);end.setDate(monday.getDate()+6);
   const start=localISO(monday),last=localISO(end),n=[...dates].filter(d=>d>=start&&d<=last).length;
@@ -423,14 +423,14 @@ let selectedTrendAction='',selectedTrendUnit=null,trendPickerMuscle='全部';
 let selectedTrendMetric='weight',selectedTrendRange='all',activeTrendData=null;
 function trendRangeBounds(preset,startValue,endValue) {
  if (preset==='custom') {
-  const end=endValue&&endValue<TODAY?endValue:TODAY;
+  const end=endValue&&endValue<today()?endValue:today();
   if (startValue&&startValue>end) return {start:startValue,end,invalid:true};
   return {start:startValue,end};
  }
- if (preset==='all') return {start:'',end:TODAY};
- const today=new Date(TODAY+'T12:00:00');
+ if (preset==='all') return {start:'',end:today()};
+ const today=new Date(today()+'T12:00:00');
  today.setDate(today.getDate()-Number(preset)+1);
- return {start:localISO(today),end:TODAY};
+ return {start:localISO(today),end:today()};
 }
 function hasConfirmedSets(record) {
  return !record.legacy&&(record.sets||[]).some(set=>set&&set.verified!==false);
@@ -573,7 +573,7 @@ function renderTrendInsights(data) {
 function renderTrend() {
  const selected=renderTrendPicker();
  const startInput=document.querySelector('#trendStart'),endInput=document.querySelector('#trendEnd');
- startInput.max=TODAY;endInput.max=TODAY;
+ startInput.max=today();endInput.max=today();
  document.querySelector('#trendCustomRange').hidden=selectedTrendRange!=='custom';
  const range=trendRangeBounds(selectedTrendRange,startInput.value,endInput.value);
  const data=collectActionTrend(selected,range,selectedTrendMetric,selectedTrendUnit);
@@ -645,7 +645,7 @@ function openImageDB(){if(!dbPromise)dbPromise=new Promise((resolve,reject)=>{co
 async function imagePut(id,file){const db=await openImageDB();return new Promise((resolve,reject)=>{const tx=db.transaction(PHOTO_STORE,'readwrite');tx.objectStore(PHOTO_STORE).put(file,id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
 async function imageGet(id){const db=await openImageDB();return new Promise((resolve,reject)=>{const req=db.transaction(PHOTO_STORE,'readonly').objectStore(PHOTO_STORE).get(id);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});}
 async function imageDelete(id){const db=await openImageDB();return new Promise((resolve,reject)=>{const tx=db.transaction(PHOTO_STORE,'readwrite');tx.objectStore(PHOTO_STORE).delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
-let activeDay=TODAY,calMonth=new Date(Number(TODAY.slice(0,4)),Number(TODAY.slice(5,7))-1,1),incomingPhotos=[];let draftPhotoUrls=[],savedPhotoUrls=[],dayRenderIndex=0;
+let activeDay=today(),calMonth=new Date(Number(today().slice(0,4)),Number(today().slice(5,7))-1,1),incomingPhotos=[];let draftPhotoUrls=[],savedPhotoUrls=[],dayRenderIndex=0;
 // 临时上传预览和已经保存的照片分开管理 URL，切换日期时清理资源避免内存泄漏。
 function makePhotoURL(blob,collection=draftPhotoUrls){const url=URL.createObjectURL(blob);collection.push(url);return url;}
 function releasePhotos(){draftPhotoUrls.forEach(url=>URL.revokeObjectURL(url));draftPhotoUrls=[];}
@@ -664,7 +664,7 @@ function renderCalendar(){
   const date=`${monthPrefix}-${pad(day)}`,cnt=monthlyRecords.filter(r=>r.date===date).length,ch=checkins[date],checked=!!ch?.completed,photos=(ch?.photos||[]).length;
   const daySets=monthlyRecords.filter(r=>r.date===date).reduce((n,r)=>n+(r.sets||[]).filter(st=>st&&st.verified===true).length,0);
   const level=daySets>=5?3:daySets>=2?2:cnt||checked?1:0;
-  markup+=`<button type="button" data-day="${date}" class="cal-day level-${level} ${date===TODAY?'today':''} ${date===activeDay?'selected':''}" title="${date}：${cnt} 项动作${checked?' · 已打卡':''}${photos?' · '+photos+' 张照片':''}"><span class="cal-number">${day}</span><span class="cal-day-flags">${checked?'<span class="cal-check" aria-label="已打卡">✓</span>':''}${photos?'<span class="cal-photo" aria-label="有照片">▣</span>':''}</span><span class="cal-day-bottom">${daySets?`<span class="cal-count">${daySets} 组</span>`:(cnt?`<span class="cal-count">有记录</span>`:'')}</span></button>`;
+  markup+=`<button type="button" data-day="${date}" class="cal-day level-${level} ${date===today()?'today':''} ${date===activeDay?'selected':''}" title="${date}：${cnt} 项动作${checked?' · 已打卡':''}${photos?' · '+photos+' 张照片':''}"><span class="cal-number">${day}</span><span class="cal-day-flags">${checked?'<span class="cal-check" aria-label="已打卡">✓</span>':''}${photos?'<span class="cal-photo" aria-label="有照片">▣</span>':''}</span><span class="cal-day-bottom">${daySets?`<span class="cal-count">${daySets} 组</span>`:(cnt?`<span class="cal-count">有记录</span>`:'')}</span></button>`;
  }
  document.querySelector('#calendarDays').innerHTML=markup;renderDayDetails();
 }
@@ -688,7 +688,7 @@ document.querySelector('#dayDetails').addEventListener('click',async e=>{const n
 /* ================== 模块 G：完整备份（包含图片）与恢复 ================== */
 function blobAsDataURL(blob){return new Promise((resolve,reject)=>{const rd=new FileReader();rd.onload=()=>resolve(rd.result);rd.onerror=reject;rd.readAsDataURL(blob);});}
 async function exportData(){const b=document.querySelector('#exportBtn');b.disabled=true;b.textContent='正在准备备份…';try{const photoIds=[...new Set(Object.values(checkins).flatMap(ch=>ch.photos||[]))],images={};for(const id of photoIds){try{const blob=await imageGet(id);if(blob)images[id]=await blobAsDataURL(blob);}catch{}}
- const payload={app:'MotionLog',version:1,exportedAt:new Date().toISOString(),trainingNotesBatch:TRAINING_NOTES_BATCH,records,checkins,images,gifBindings};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`motionlog-backup-${TODAY}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);toast('已生成完整 JSON 备份');}catch(e){toast('备份失败：'+e.message,true);}finally{b.disabled=false;b.textContent='导出备份';}}
+ const payload={app:'MotionLog',version:1,exportedAt:new Date().toISOString(),trainingNotesBatch:TRAINING_NOTES_BATCH,records,checkins,images,gifBindings};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`motionlog-backup-${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);toast('已生成完整 JSON 备份');}catch(e){toast('备份失败：'+e.message,true);}finally{b.disabled=false;b.textContent='导出备份';}}
 document.querySelector('#exportBtn').onclick=exportData;document.querySelector('#importBtn').onclick=()=>document.querySelector('#importFile').click();
 document.querySelector('#mergeTrainingNotes').onclick=()=>{
  // 优先使用本地最新数据，且只写入训练记录键，不操作打卡照片或备注。
@@ -977,7 +977,7 @@ document.querySelector('#catalogPreview').addEventListener('click',e=>{
 document.querySelector('#trainMuscle').addEventListener('change',e=>{catalogMuscle=e.target.value;catalogEquip='全部';renderCatalog();});
 document.querySelector('#recentActionChips').addEventListener('click',e=>{const b=e.target.closest('[data-recent]');if(!b)return;const r=[...records].sort((a,b)=>byDate(a,b,true)).find(x=>x.name===b.dataset.recent);document.querySelector('#trainName').value=b.dataset.recent;if(r){document.querySelector('#trainMuscle').value=r.muscle;catalogMuscle=r.muscle;}renderCatalog();});
 
-document.querySelector('#todayCheckin').addEventListener('click',()=>{const d=TODAY;calMonth=new Date(+d.slice(0,4),+d.slice(5,7)-1,1);chooseDay(d);});
+document.querySelector('#todayCheckin').addEventListener('click',()=>{const d=today();calMonth=new Date(+d.slice(0,4),+d.slice(5,7)-1,1);chooseDay(d);});
 document.querySelector('#dayNewWorkout').addEventListener('click',()=>{openEditor(null,selectedRegion);document.querySelector('#trainDate').value=activeDay;});
 
 
@@ -1067,8 +1067,8 @@ function copyableLastReps(set) {
 }
 function renderLastWorkout() {
  const muscle = document.getElementById('quickMuscle').value;
- const trainingDate = document.getElementById('quickDate').value || TODAY;
- const source = records.filter(record => record.muscle === muscle && /^\d{4}-\d{2}-\d{2}$/.test(record.date || '') && record.date < trainingDate && record.date <= TODAY);
+ const trainingDate = document.getElementById('quickDate').value || today();
+ const source = records.filter(record => record.muscle === muscle && /^\d{4}-\d{2}-\d{2}$/.test(record.date || '') && record.date < trainingDate && record.date <= today());
  lastWorkoutDay = source.reduce((latest, record) => record.date > latest ? record.date : latest, '');
  const dayLabel = document.getElementById('lastWorkoutDate');
  const summary = document.getElementById('lastWorkoutSummary');
@@ -1131,10 +1131,10 @@ document.getElementById('lastWorkoutBody').addEventListener('click', event => {
 
 function refreshQuickHome(){
  if(!document.getElementById('quickTodayList'))return;
- const date=document.getElementById('quickDate').value||TODAY;
+ const date=document.getElementById('quickDate').value||today();
  const chosen=records.filter(r=>r.date===date);
  const count=chosen.reduce((sum,r)=>sum+(r.sets||[]).filter(s=>s.verified!==false).length,0);
- document.getElementById('quickLogHeading').textContent=date===TODAY?'今日训练':date.slice(5).replace('-',' / ')+' 训练';
+ document.getElementById('quickLogHeading').textContent=date===today()?'今日训练':date.slice(5).replace('-',' / ')+' 训练';
  document.getElementById('quickLogCount').textContent=`${count} 组`;
  renderQuickDayGroups(date,'quickTodayList');
  renderLastWorkout();
@@ -1150,7 +1150,7 @@ function syncTrainingViews(){
  // 无论从首页、详细弹窗、月历完成打卡，都统一刷新全部可见视图。
  renderDashboard();renderHistory();renderCalendar();refreshQuickHome();
 }
-document.getElementById('quickDate').value=TODAY;
+document.getElementById('quickDate').value=today();
 document.getElementById('quickMuscle').innerHTML=MUSCLE_NAMES.map(x=>`<option value="${h(x)}">${h(x)}</option>`).join('');
 document.getElementById('quickAction').addEventListener('change',()=>{
  syncQuickActionMuscle();
@@ -1262,7 +1262,7 @@ function celebrateCheckin(){
 }
 
 document.getElementById('quickCheckinBtn').addEventListener('click',()=>{
- const day=document.getElementById('quickDate').value||TODAY,old=checkins[day]||{notes:[],photos:[]};
+ const day=document.getElementById('quickDate').value||today(),old=checkins[day]||{notes:[],photos:[]};
  if(old.completed)return;
  checkins[day]={...old,completed:true};
  try{saveCheckins();}catch(e){return toast('打卡未保存，请检查本地存储',true);}
@@ -1287,7 +1287,7 @@ document.getElementById('quickFiles').addEventListener('change',e=>{
 document.getElementById('quickFilePreviews').addEventListener('click',e=>{const b=e.target.closest('[data-quick-remove-photo]');if(b){quickPhotoFiles.splice(+b.dataset.quickRemovePhoto,1);renderQuickPhotoPreviews();}});
 document.getElementById('quickPhotoForm').addEventListener('submit',async e=>{
  e.preventDefault();const btn=document.getElementById('quickSavePhoto');btn.disabled=true;
- const day=document.getElementById('quickDate').value||TODAY;
+ const day=document.getElementById('quickDate').value||today();
  const note=document.getElementById('quickNote').value.trim(),photos=[];
  try{
   for(const file of quickPhotoFiles){const id=UID();await imagePut(id,file);photos.push(id);}
@@ -1313,9 +1313,13 @@ refreshQuickHome();
 
 /* 页面初始化：先将 CRUD/旧记录功能启动；Three.js 使用另一个 ES module 加载 */
 initFormFields();document.querySelector('#clockDate').textContent=new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date());
-document.querySelector('#heroDate').textContent=new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric',weekday:'long'}).format(new Date());renderDashboard();renderHistory();document.querySelector('#checkinDate').value=TODAY;chooseDay(TODAY);catalogMuscle='背部';renderCatalog();renderRecentActionChips();showView('dashboard');
+document.querySelector('#heroDate').textContent=new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric',weekday:'long'}).format(new Date());renderDashboard();renderHistory();document.querySelector('#checkinDate').value=today();chooseDay(today());catalogMuscle='背部';renderCatalog();renderRecentActionChips();showView('dashboard');
 if (trainingNotesSaveFailed) toast('补录已显示，浏览器未能完成本地保存',true);
 // CDN 可能被浏览器扩展或离线环境阻断；超时后给出明确提示，而不是永久显示加载中。
 
 
 document.getElementById('deleteRecord').addEventListener('click',()=>removeTrainingRecord(editingId));
+
+let lastObservedToday=today();
+function refreshDateBoundary(){const next=today();if(next===lastObservedToday)return;const input=document.getElementById('quickDate');if(input.value===lastObservedToday)input.value=next;lastObservedToday=next;document.getElementById('heroDate').textContent=dateLabel(next);syncTrainingViews();}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDateBoundary();});window.addEventListener('focus',refreshDateBoundary);
