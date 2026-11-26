@@ -132,7 +132,7 @@ function showFinishTraining(){
  const day=document.getElementById('quickDate').value||today(),items=records.filter(r=>r.date===day);const sets=items.flatMap(r=>(r.sets||[]).filter(s=>s.verified!==false));
  const volume={};for(const s of sets)if(Number.isFinite(s.weight)&&Number.isFinite(s.reps)&&!s.plus)volume[s.unit||'未标单位']=(volume[s.unit||'未标单位']||0)+s.weight*s.reps;
  let summary=document.getElementById('finishSummary');if(!summary){summary=document.createElement('p');summary.id='finishSummary';document.getElementById('quickPhotoForm').prepend(summary);}
- summary.textContent=`${dateLabel(day)} · ${new Set(items.map(r=>r.muscle+'|'+r.name)).size} 个动作 · ${sets.length} 组 · 总训练量 ${Object.entries(volume).map(([u,n])=>fmtNum(n)+' '+u+'×次').join(' / ')||'—'} · ${sets.filter(s=>s.pr).length} 个 PR`;
+ summary.textContent=`${dateLabel(day)} · ${new Set(items.map(r=>r.muscle+'|'+r.name)).size} 个动作 · ${sets.length} 组 · 总训练量 ${Object.entries(volume).map(([u,n])=>fmtNum(n)+' '+u+'×次').join(' / ')||'—'} · ${(window.TrainingMetrics?.getPRs(records)||[]).filter(item=>item.record.date===day).length} 个 PR`;
  document.getElementById('quickCheckinDialogTitle').textContent='结束训练';document.getElementById('quickSavePhoto').textContent='保存训练小结';openOverlay('quickCheckinOverlay');
 }
 function renderAnalytics(){
@@ -173,17 +173,19 @@ function groupRecords(source,keyOf) {
  }
  return [...buckets];
 }
+let prIndex=new Map();
+function prBadge(recordId,index){return prIndex.has(window.TrainingMetrics?.key(recordId,index))?'<span class="pr-badge" title="同动作同单位的个人纪录">PR</span>':'';}
 function renderHistoryAction(action,showName) {
  // 重量参考无组号；每条已确认记录占用实际组序，重复组单独保留。
  let ordinal=0;
- const details=action.sets.map(({set,recordId,legacy})=>{
+ const details=action.sets.map(({set,recordId,index,legacy})=>{
   const label=legacy?'重量参考':`第 ${pad(++ordinal)} 组`;
   const extras=[
    set.failureAt>0?`第 ${h(set.failureAt)} 次力竭`:'',
    set.formBreakAt>0?`第 ${h(set.formBreakAt)} 次变形`:'',
    h(set.note)
   ].filter(Boolean).join(' · ');
-  return `<div class="history-set-row"><span class="history-set-num">${label}</span><strong>${quickSetText(set)}</strong>${extras?`<small>${extras}</small>`:''}<button type="button" data-edit="${h(recordId)}">编辑</button><button type="button" data-remove="${h(recordId)}" class="btn-danger">删除</button></div>`;
+  return `<div class="history-set-row"><span class="history-set-num">${label}</span><strong>${quickSetText(set)}</strong>${prBadge(recordId,index)}${extras?`<small>${extras}</small>`:''}<button type="button" data-edit="${h(recordId)}">编辑</button><button type="button" data-remove="${h(recordId)}" class="btn-danger">删除</button></div>`;
  }).join('');
  const notes=action.records.filter(record=>record.notes).map(record=>`<div class="history-set-note">${h(record.notes)}</div>`).join('');
  return `<div class="history-action-panel"><div class="history-action-title">${showName?`<strong>${h(action.name)}</strong>`:''}<span>${ordinal?`${ordinal} 组`:'组数未注明'}</span></div>${details||'<div class="history-set-note">暂无逐组数据</div>'}${notes}</div>`;
@@ -206,6 +208,7 @@ function renderHistoryDays(source,mode,sort) {
  }).join('');
 }
 function renderHistory() {
+ prIndex=window.TrainingMetrics?.buildPRIndex(records)||new Map();
  const filter=document.querySelector('#historyFilter');
  const sort=document.querySelector('#historySort');
  const keyOf=historyKeys[historyMode];
@@ -337,12 +340,13 @@ function collectActionTrend(action,range,metric,preferredUnit) {
  // 单位切换只影响重量/训练量。默认用最近有记录的单位，未标单位作为独立选项。
  const lastLoaded=allSets.findLast(set=>numericSetValue(set.weight)!==null&&!set.plus);
  const unit=units.includes(preferredUnit)?preferredUnit:(lastLoaded?(lastLoaded.unit||''):(units[0]||''));
+ const prDays=new Set((window.TrainingMetrics?.getPRs(records)||[]).filter(item=>action&&item.record.name===action.name&&item.record.muscle===action.muscle).map(item=>item.record.date));
  const series=trendDisplay==='sets'?TREND_SETS.map((style,index)=>({...style,values:sessions.map(session=>trendSetValue(session.sets[index],metric,unit))})):[{name:metric==='volume'?'当日总训练量':'每次训练最佳组',color:'#91ead0',dash:'',values:sessions.map(session=>{const values=session.sets.map(s=>trendSetValue(s,metric,unit)).filter(n=>n!==null);return values.length?(metric==='volume'?values.reduce((n,x)=>n+x,0):Math.max(...values)):null;})}];
- const estimates=allSets.filter(s=>s.verified!==false&&!s.plus&&s.unit===unit&&Number.isFinite(s.weight)&&s.weight>0&&Number.isFinite(s.reps)&&s.reps>0&&s.reps<=12).map(s=>s.weight*(1+s.reps/30));
+ const estimates=allSets.filter(s=>s.unit===unit).map(s=>window.TrainingMetrics?.estimate1RM(s)).filter(n=>n!==null&&n!==undefined);
  const eligibleLoads=allSets.map(set=>trendSetValue(set,'weight',unit)).filter(value=>value!==null);
  const recent=sessions.at(-1);
  const recentValues=(recent?.sets||[]).map(set=>trendSetValue(set,'volume',unit)).filter(value=>value!==null);
- return {dates:sessions.map(session=>session.date),sessions,estimate:estimates.length?Math.max(...estimates):null,series,units,unit,setCount:allSets.length,
+ return {dates:sessions.map(session=>session.date),prDays,sessions,estimate:estimates.length?Math.max(...estimates):null,series,units,unit,setCount:allSets.length,
   peak:eligibleLoads.length?Math.max(...eligibleLoads):null,
   lastVolume:{value:recentValues.length?recentValues.reduce((sum,value)=>sum+value,0):null,count:recentValues.length,total:recent?.sets.length||0}
  };
@@ -383,6 +387,7 @@ function trendSvg(data,unit,message) {
     return;
    }
    const x=xs[i],y=yAt(value);
+   if(seriesIndex===0&&data.prDays?.has(data.dates[i]))dots+=`<text x="${x}" y="${Math.max(12,y-12)}" fill="#d2c7ef" text-anchor="middle" font-size="11">PR</text>`;
    points.push(`${x.toFixed(2)},${y.toFixed(2)}`);
    // 外环、中环、实心点可在三组数值完全重合时同时辨认。
    const radius=[6,5,4,3,2.5][seriesIndex];
@@ -862,12 +867,13 @@ function quickSetText(set){
 }
 function renderQuickDayGroups(date,hostId){
  const host=document.getElementById(hostId);if(!host)return;
+ prIndex=window.TrainingMetrics?.buildPRIndex(records)||new Map();
  const groups=workoutGroupsForDate(date);
  if(!groups.length){host.innerHTML='<div class="quick-empty">还没有训练。记录第一组后会出现在这里。</div>';return;}
  host.innerHTML=groups.map(group=>`<section class="day-muscle-group"><div class="day-muscle-title"><span class="muscle-accent"></span><h3>${h(group.muscle)}</h3><small>${group.actions.length} 个动作</small></div><div class="day-action-groups">${group.actions.map(action=>{
   const confirmed=action.sets.filter(x=>x.set.verified!==false).length;
   const label=confirmed?`${confirmed} 组`:'旧记录';
-  const rows=action.sets.map((part,i)=>`<div class="day-set-row"><span class="day-set-no">${part.legacy?'参考':`第 ${pad(action.sets.slice(0,i+1).filter(x=>!x.legacy).length)} 组`}</span><strong>${quickSetText(part.set)}</strong>${part.legacy?'<span class="day-set-legacy">组数不明</span>':''}<button type="button" data-quick-edit="${h(part.recordId)}" aria-label="编辑 ${h(action.name)} 第 ${i+1} 条记录">编辑</button><button type="button" data-remove-set="${h(part.recordId)}" data-set-index="${part.index}" aria-label="删除 ${h(action.name)} 第 ${i+1} 组">删除</button></div>`).join('');
+  const rows=action.sets.map((part,i)=>`<div class="day-set-row"><span class="day-set-no">${part.legacy?'参考':`第 ${pad(action.sets.slice(0,i+1).filter(x=>!x.legacy).length)} 组`}</span><strong>${quickSetText(part.set)}</strong>${prBadge(part.recordId,part.index)}${part.legacy?'<span class="day-set-legacy">组数不明</span>':''}<button type="button" data-quick-edit="${h(part.recordId)}" aria-label="编辑 ${h(action.name)} 第 ${i+1} 条记录">编辑</button><button type="button" data-remove-set="${h(part.recordId)}" data-set-index="${part.index}" aria-label="删除 ${h(action.name)} 第 ${i+1} 组">删除</button></div>`).join('');
   return `<div class="day-action-group"><div class="day-action-title"><strong>${h(action.name)}</strong><span>${label}</span></div><div class="day-set-list">${rows||'<div class="quick-empty">无组数据</div>'}</div></div>`;
  }).join('')}</div></section>`).join('');
 }
@@ -1002,7 +1008,8 @@ document.getElementById('quickForm').addEventListener('submit',e=>{
  
  syncTrainingViews();renderRecentActionChips();
  window.RestTimer?.start();
- toast('已记录 1 组',false,()=>{for(const r of records)r.sets=r.sets.filter(set=>set.id!==s.id);records=records.filter(r=>r.sets.length);saveRecords();syncTrainingViews();});document.getElementById('quickReps').focus();document.getElementById('quickReps').select();
+ const addedRow=records.find(r=>r.sets.includes(s));const newPR=window.TrainingMetrics?.buildPRIndex(records).has(window.TrainingMetrics.key(addedRow.id,addedRow.sets.indexOf(s)));
+ toast(newPR?'新纪录！已记录 1 组':'已记录 1 组',false,()=>{for(const r of records)r.sets=r.sets.filter(set=>set.id!==s.id);records=records.filter(r=>r.sets.length);saveRecords();syncTrainingViews();});document.getElementById('quickReps').focus();document.getElementById('quickReps').select();
 });
 document.getElementById('quickTodayList').addEventListener('click',e=>{const b=e.target.closest('[data-quick-edit]');if(b)openEditor(b.dataset.quickEdit);const del=e.target.closest('[data-remove-set]');if(del)removeTrainingRecord(del.dataset.removeSet,+del.dataset.setIndex);});
 document.getElementById('quickGoHistory').addEventListener('click',()=>showView('history'));
