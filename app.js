@@ -1060,7 +1060,7 @@ const lastWorkoutTargets = new Map([
 ]);
 let lastWorkoutDay = '';
 function copyableLastWeight(set) {
- return Number.isFinite(set.weight) && set.weight >= 0 && !set.plus && ['kg','lb'].includes(set.unit);
+ return Number.isFinite(set.weight) && set.weight >= 0 && !set.plus && ['kg','lb','片',''].includes(set.unit);
 }
 function copyableLastReps(set) {
  return Number.isInteger(set.reps) && set.reps >= 1 && set.reps <= 999;
@@ -1125,7 +1125,7 @@ document.getElementById('lastWorkoutBody').addEventListener('click', event => {
  // 只将可靠数值带入草稿，力竭、变形和备注留在历史侧供参考。
  weight.value = usableSet && copyableLastWeight(set) ? String(set.weight) : '';
  document.getElementById('quickReps').value = usableSet && copyableLastReps(set) ? String(set.reps) : '';
- if (usableSet && ['kg','lb'].includes(set.unit)) document.getElementById('quickUnit').value = set.unit;
+ if (usableSet && ['kg','lb','片',''].includes(set.unit)) document.getElementById('quickUnit').value = set.unit;
  weight.focus();
 });
 
