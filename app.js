@@ -186,6 +186,21 @@ if (!Array.isArray(savedRecords) || readJSON(TRAINING_NOTES_IMPORT_KEY,null)!==T
 }
 let checkins=readJSON(CHECKIN_KEY,{});if(!checkins || typeof checkins!=='object'||Array.isArray(checkins))checkins={};
 let saveCheckins=()=>localStorage.setItem(CHECKIN_KEY,JSON.stringify(checkins));
+const PREFERENCES_KEY='motionlog_preferences_v1';
+let appPreferences=readJSON(PREFERENCES_KEY,{});if(!appPreferences||typeof appPreferences!=='object'||Array.isArray(appPreferences))appPreferences={};
+let savePreferences=()=>localStorage.setItem(PREFERENCES_KEY,JSON.stringify(appPreferences));
+let lastQuickAction='';
+function saveQuickUnit(){const name=document.getElementById('quickAction').value.trim(),muscle=document.getElementById('quickMuscle').value,unit=document.getElementById('quickUnit').value;appPreferences.actionUnits={...(appPreferences.actionUnits||{}),[muscle+'|'+name]:unit};appPreferences.lastUnit=unit;savePreferences();}
+function prefillQuickAction(){
+ const name=document.getElementById('quickAction').value.trim();if(name===lastQuickAction)return;lastQuickAction=name;
+ syncQuickActionMuscle();const muscle=document.getElementById('quickMuscle').value,date=document.getElementById('quickDate').value||today();
+ const matching=records.filter(r=>r.name===name&&r.muscle===muscle&&r.date<=date).sort((a,b)=>byDate(a,b,true));
+ const first=matching[0]?.sets?.find(s=>s.verified!==false);
+ document.getElementById('quickWeight').value=first?.weight??'';document.getElementById('quickReps').value=first?.reps??'';
+ document.getElementById('quickUnit').value=appPreferences.actionUnits?.[muscle+'|'+name]??first?.unit??appPreferences.lastUnit??'lb';
+ if(document.getElementById('quickDuration'))document.getElementById('quickDuration').value=first?.duration??'';
+ renderLastWorkout();
+}
 const getLoad=rec=>Array.isArray(rec.sets)?rec.sets.filter(s=>s.weight!==null&&s.weight!==''&&Number.isFinite(+s.weight)).map(s=>`${s.weight}${s.plus?'+':''}${s.unit?' '+s.unit:''}`).join(' / '):'';
 const dateLabel=date=>date?`${date.slice(5,7)}/${date.slice(8,10)}/${date.slice(0,4)}`:'日期未注明';
 const byDate=(a,b,desc=true)=>(desc?-1:1)*(String(a.date||'0000').localeCompare(String(b.date||'0000')) || (Number(a.createdAt)||0)-(Number(b.createdAt)||0));
@@ -952,7 +967,7 @@ function applyCatalogAction(zh){
  const a=CATALOG.find(x=>x.zh===zh);if(!a)return;
  catalogSelected=a;catalogMuscle=a.muscle;choosingCatalogGif=false;
  document.querySelector('#trainMuscle').value=a.muscle;document.querySelector('#trainName').value=a.zh;
- document.getElementById('quickAction').value=a.zh;document.getElementById('quickMuscle').value=a.muscle;renderLastWorkout();
+ document.getElementById('quickAction').value=a.zh;document.getElementById('quickMuscle').value=a.muscle;prefillQuickAction();
  renderCatalog();renderCatalogPreview();
  /* V6：表单隐藏于高级记录弹窗，选中后先预览 GIF，不转移焦点。 */
 }
@@ -1153,8 +1168,7 @@ function syncTrainingViews(){
 document.getElementById('quickDate').value=today();
 document.getElementById('quickMuscle').innerHTML=MUSCLE_NAMES.map(x=>`<option value="${h(x)}">${h(x)}</option>`).join('');
 document.getElementById('quickAction').addEventListener('change',()=>{
- syncQuickActionMuscle();
- renderLastWorkout();
+ prefillQuickAction();
 });
 document.getElementById('quickMuscle').addEventListener('change',renderLastWorkout);
 document.getElementById('quickDate').addEventListener('change',refreshQuickHome);
@@ -1173,6 +1187,7 @@ document.getElementById('quickForm').addEventListener('submit',e=>{
  const weight=+w,rep=+reps;
  if(!Number.isFinite(weight)||weight<0||!Number.isInteger(rep)||rep<1||rep>999)return toast('重量应为非负数，次数应为正整数',true);
  const s={id:UID(),weight,reps:rep,unit,plus:false,failureAt:null,formBreakAt:null,verified:true};
+ saveQuickUnit();
  const existing=[...records].reverse().find(r=>r.quickEntry===true&&r.date===date&&r.name===name&&r.muscle===muscle);
  if(existing){existing.sets.push(s);}else{records.push({id:UID(),date,name,muscle,sets:[s],legacy:false,quickEntry:true,recentV4:true,notes:'',createdAt:Date.now()});}
  try{saveRecords();}catch(err){if(existing)existing.sets.pop();else records.pop();return toast('本地空间不足，训练未保存',true);}
@@ -1323,3 +1338,5 @@ document.getElementById('deleteRecord').addEventListener('click',()=>removeTrain
 let lastObservedToday=today();
 function refreshDateBoundary(){const next=today();if(next===lastObservedToday)return;const input=document.getElementById('quickDate');if(input.value===lastObservedToday)input.value=next;lastObservedToday=next;document.getElementById('heroDate').textContent=dateLabel(next);syncTrainingViews();}
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshDateBoundary();});window.addEventListener('focus',refreshDateBoundary);
+
+document.getElementById('quickUnit').addEventListener('change',saveQuickUnit);
