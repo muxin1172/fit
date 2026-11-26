@@ -1159,3 +1159,5 @@ window.addEventListener('motion:layout-ready',mountTimerSettings);
 async function previewSavedPhoto(id){const day=document.getElementById('checkinDate').value,ids=checkins[day]?.photos||[];window.PhotoTools.open(ids.map(photoId=>({getBlob:()=>imageGet(photoId),caption:dateLabel(day)})),Math.max(0,ids.indexOf(id)));}
 document.getElementById('dayDetails').addEventListener('click',e=>{const img=e.target.closest('[data-preview-photo]');if(img)void previewSavedPhoto(img.dataset.previewPhoto);});
 document.getElementById('dayDetails').addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)&&e.target.dataset.previewPhoto){e.preventDefault();void previewSavedPhoto(e.target.dataset.previewPhoto);}});
+
+if('serviceWorker' in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{});});
