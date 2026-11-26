@@ -1,4 +1,4 @@
-/* ================== 模块 A：基础配置、历史记录、浏览器持久化 ================== */
+
 const REGIONS = {
   '背部':{en:'BACK',intro:'背阔肌、斜方肌、菱形肌与竖脊肌。常见训练包括下拉、划船和单臂器械。',keys:['latissimus','trapezius','rhomboid','erector','infraspinatus','teres major','serratus posterior'],search:['back','latissimus','lats','trapezius','rowing','pulldown','pull up']},
   '胸部':{en:'CHEST',intro:'以胸大肌和胸小肌为主，常见训练包括卧推、器械推胸和夹胸。',keys:['pectoralis','pectoral'],search:['chest','pectoralis','bench press','chest press','fly']},
@@ -38,7 +38,7 @@ function prefillQuickAction(){
  renderLastWorkout();
 }
 const getLoad=rec=>Array.isArray(rec.sets)?rec.sets.filter(s=>s.weight!==null&&s.weight!==''&&Number.isFinite(+s.weight)).map(s=>`${s.weight}${s.plus?'+':''}${s.unit?' '+s.unit:''}`).join(' / '):'';
-const dateLabel=date=>date?`${date.slice(5,7)}/${date.slice(8,10)}/${date.slice(0,4)}`:'日期未注明';
+function dateLabel(date){if(!date)return '日期未注明';const d=new Date(date+'T12:00:00');if(!Number.isFinite(d.getTime()))return '日期待确认';return new Intl.DateTimeFormat('zh-CN',{...(d.getFullYear()!==new Date().getFullYear()?{year:'numeric'}:{}),month:'long',day:'numeric',weekday:'short'}).format(d);}
 const byDate=(a,b,desc=true)=>(desc?-1:1)*(String(a.date||'0000').localeCompare(String(b.date||'0000')) || (Number(a.createdAt)||0)-(Number(b.createdAt)||0));
 function toast(msg,isError=false,undo=null){
  const e=document.querySelector('#toast');e.replaceChildren();e.setAttribute('role','status');e.dataset.error=String(isError);e.append(document.createTextNode(msg));
@@ -65,24 +65,13 @@ function removeTrainingRecord(id,setIndex=null){
 }
 
 
-/* ================== 模块 B：模块切换、概览与统计 ================== */
+
 let selectedRegion='背部', selectedAction='', editingId=null;
-function showView(view){if(view==='record')view='dashboard';document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id===view));document.querySelectorAll('#nav button').forEach(el=>el.classList.toggle('active',el.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='dashboard')renderDashboard();if(view==='history')renderHistory();if(view==='checkin')renderCalendar();}
+function showView(view){if(view==='record')view='dashboard';document.querySelectorAll('.view').forEach(el=>el.classList.toggle('active',el.id===view));document.querySelectorAll('#nav button').forEach(el=>el.classList.toggle('active',el.dataset.view===view));document.getElementById('quickAdd').hidden=view==='dashboard';window.scrollTo({top:0,behavior:'smooth'});if(view==='dashboard')renderDashboard();if(view==='history')renderHistory();if(view==='checkin')renderCalendar();}
 document.querySelector('#nav').addEventListener('click',e=>{const b=e.target.closest('button[data-view]');if(b)showView(b.dataset.view);});
 document.querySelectorAll('[data-jump]').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.jump)));
 document.querySelector('#quickAdd').addEventListener('click',()=>openEditor());
-function renderDashboard(){
- const dates=new Set([...records.map(r=>r.date).filter(Boolean),...Object.entries(checkins).filter(([,c])=>c?.completed).map(([d])=>d)]);
- document.querySelector('#statDays').textContent=dates.size;
- document.querySelector('#statExercises').textContent=records.length;
- document.querySelector('#statSets').textContent=records.reduce((n,r)=>n+(r.sets||[]).filter(s=>s.verified).length,0);
- document.querySelector('#statMuscles').innerHTML=`${new Set(records.map(r=>r.muscle)).size}<small>/ 8</small>`;
- const sorted=[...records].sort((a,b)=>byDate(a,b,true)).slice(0,5);
- document.querySelector('#recentList').innerHTML=sorted.map(r=>`<div class="recent-item"><div class="recent-icon">${h(r.muscle[0])}</div><div class="recent-main"><strong>${h(r.name)}</strong><small>${dateLabel(r.date)} · ${h(r.muscle)}${r.legacy?' · 旧记录':''}</small></div><div class="recent-load">${h(getLoad(r)||'—')}<small style="display:block;font-size:10px;color:#77899e;font-weight:400">${r.sets.some(s=>s.unit)?'':'单位待确认'}</small></div></div>`).join('')||'<div class="empty-state">尚无记录</div>';
- // 肌群分布按确切训练组数，不按照动作条目数。历史数据中未确定的组数不参与计数。
- const counts=MUSCLE_NAMES.map(m=>({name:m,count:records.filter(r=>r.muscle===m).reduce((sum,r)=>sum+(r.sets||[]).filter(set=>set&&set.verified===true).length,0)})).sort((a,b)=>b.count-a.count), max=Math.max(1,...counts.map(x=>x.count));
- document.querySelector('#distribution').innerHTML=counts.map(x=>`<div class="bar-line"><span>${x.name}</span><div class="bar-track"><div class="bar-fill" style="width:${x.count/max*100}%"></div></div><span class="bar-num">${x.count}</span></div>`).join('');
-}
+function renderDashboard(){refreshQuickHome();}
 
 const EXERCISES_ROOT='https://cdn.jsdelivr.net/gh/hasaneyldrm/exercises-dataset@main/';
 let exerciseDatabase=null, gifError='', gifsLoading=null;
@@ -131,11 +120,8 @@ document.querySelector('#trainingForm').addEventListener('submit',e=>{e.preventD
  if(old){records=records.map(x=>x.id===editingId?item:x);}else records.push(item);try{saveRecords();}catch{toast('浏览器空间不足，保存失败',true);return;}editingId=null;toast('训练已保存 · 已更新历史与日历');renderDashboard();renderHistory();renderCalendar();closeOverlay('advancedOverlay');refreshQuickHome();
 });
 
-/* ================== 模块 E：历史查询、编辑、删除、同单位趋势 ================== */
-/* ================== 模块 E.1：可视化统计 ==================
-   所有图均使用浏览器原生 SVG/CSS，无额外库；采用本地日期以免跨时区偏移。
-   活跃日期及动作趋势只使用不晚于今天的已知日期。
-   一周从周一开始，按真实训练日期去重统计训练天数。 */
+
+
 const CHART_COLORS=['#8de4c8','#8aa9f4','#edba83','#cb9de3','#6dcdbd','#efa1b0','#90bacd','#c5d487'];
 function datedRecords(){return records.filter(r=>/^\d{4}-\d{2}-\d{2}$/.test(String(r.date||''))&&r.date<=today());}
 function chartMonday(d){const copy=new Date(d.getFullYear(),d.getMonth(),d.getDate(),12);copy.setDate(copy.getDate()-(copy.getDay()+6)%7);return copy;}
@@ -161,14 +147,14 @@ function renderAnalytics(){
   const start=localISO(monday),last=localISO(end),n=[...dates].filter(d=>d>=start&&d<=last).length;
   activity.push({start,end:last,count:n,label:`${monday.getMonth()+1}/${monday.getDate()}`});}
  const max=Math.max(1,...activity.map(x=>x.count));
- document.querySelector('#weeklyActivityChart').innerHTML=`<div class="weekly-columns">${activity.map((w,i)=>`<div class="weekly-col" title="${w.start} 至 ${w.end}：${w.count} 个活跃日"><div class="weekly-bar-area"><div class="weekly-track"><div class="weekly-fill" style="height:${Math.max(0,w.count/max*100)}%"></div></div></div><span class="weekly-tick">${i%2===0||i===11?h(w.label):''}</span></div>`).join('')}</div><div class="weekly-axis"><span>0</span><span>${max} 天 / 周（最高）</span></div>`;
+ document.querySelector('#weeklyActivityChart').innerHTML=`<div class="weekly-columns">${activity.map((w,i)=>`<div class="weekly-col" title="${dateLabel(w.start)} 至 ${dateLabel(w.end)}：${w.count} 个活跃日"><div class="weekly-bar-area"><div class="weekly-track"><div class="weekly-fill" style="height:${Math.max(0,w.count/max*100)}%"></div></div></div><span class="weekly-tick">${i%2===0||i===11?h(w.label):''}</span></div>`).join('')}</div><div class="weekly-axis"><span>0</span><span>${max} 天 / 周（最高）</span></div>`;
  const counts=MUSCLE_NAMES.map(name=>({name,n:records.filter(r=>r.muscle===name).reduce((sum,r)=>sum+(r.sets||[]).filter(st=>st&&st.verified===true).length,0)})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
  const total=counts.reduce((n,x)=>n+x.n,0),fallback='conic-gradient(#2b3f50 0% 100%)';
  let acc=0;
  const segments=counts.map((x,i)=>{const from=acc;acc+=100*x.n/total;return `${CHART_COLORS[i%CHART_COLORS.length]} ${from.toFixed(2)}% ${acc.toFixed(2)}%`;});
  document.querySelector('#muscleOverviewChart').innerHTML=total?`<div class="muscle-donut" role="img" aria-label="已确认的肌群训练组数占比" style="background:conic-gradient(${segments.join(',')})"><div class="muscle-donut-hole"><span>${counts.length}<small>训练肌群</small></span></div></div><div class="muscle-legend">${counts.map((x,i)=>`<div class="muscle-legend-item" title="${h(x.name)}：${x.n} 条"><span class="muscle-legend-key"><i style="background:${CHART_COLORS[i%CHART_COLORS.length]}"></i>${h(x.name)}</span><span>${Math.round(x.n/total*100)}%</span></div>`).join('')}</div>`:`<div class="empty-state">暂时没有已确认的训练组。</div>`;
 }
-/* ================== 模块 E.2：训练记录的三个查看入口 ================== */
+
 let historyMode='date',historyDayLimit=20;
 const historyExpandedDays=new Map();
 const historyFilters={date:'',muscle:'',action:''};
@@ -224,7 +210,7 @@ function renderHistory() {
  const sort=document.querySelector('#historySort');
  const keyOf=historyKeys[historyMode];
  const buckets=groupRecords(records,keyOf);
- const labelFor=(key,items)=>historyMode==='date'?(key==='unknown'?'未注明日期':key)
+ const labelFor=(key,items)=>historyMode==='date'?(key==='unknown'?'未注明日期':dateLabel(key))
   :historyMode==='muscle'?key:`${recordAction(items[0])} · ${recordMuscle(items[0])}`;
  const options=buckets.map(([key,items])=>[key,labelFor(key,items)]).sort(([a,labelA],[b,labelB])=>{
   if (historyMode==='date') return a==='unknown'?1:b==='unknown'?-1:b.localeCompare(a);
@@ -271,13 +257,14 @@ document.querySelector('#historySort').addEventListener('change',renderHistory);
 document.querySelector('#historyList').addEventListener('click',e=>{const edit=e.target.closest('[data-edit]'),remove=e.target.closest('[data-remove]');if(edit)openEditor(edit.dataset.edit);if(remove)removeTrainingRecord(remove.dataset.remove);});
 
 
-/* ================== 模块 E.3：同动作的逐组趋势 ==================
-   当前数据模型以日期为训练场次。同日同肌群同动作，按记录创建顺序及条目内组序拼接。
-   旧版重量参考不占组序。每个序号在筛选单位、重量和次数之前确定，缺值只在该组留空。 */
+
+let trendDisplay='best';
 const TREND_SETS=[
  {name:'第 1 组',color:'#91ead0',dash:''},
  {name:'第 2 组',color:'#a8b5ff',dash:'8 4'},
- {name:'第 3 组',color:'#ffd093',dash:'2 4'}
+ {name:'第 3 组',color:'#ffd093',dash:'2 4'},
+ {name:'第 4 组',color:'#e6a7ce',dash:'10 3 2 3'},
+ {name:'第 5 组',color:'#d1e39a',dash:'3 3'}
 ];
 const TREND_METRICS={weight:'重量',reps:'次数',duration:'时长（秒）',volume:'训练量'};
 const trendUnitName=unit=>unit||'未标单位';
@@ -291,9 +278,9 @@ function trendRangeBounds(preset,startValue,endValue) {
   return {start:startValue,end};
  }
  if (preset==='all') return {start:'',end:today()};
- const today=new Date(today()+'T12:00:00');
- today.setDate(today.getDate()-Number(preset)+1);
- return {start:localISO(today),end:today()};
+ const startDate=new Date(today()+'T12:00:00');
+ startDate.setDate(startDate.getDate()-Number(preset)+1);
+ return {start:localISO(startDate),end:today()};
 }
 function hasConfirmedSets(record) {
  return !record.legacy&&(record.sets||[]).some(set=>set&&set.verified!==false);
@@ -328,8 +315,8 @@ function numericSetValue(value) {
  return value===undefined||value===null||value===''||!Number.isFinite(+value)?null:+value;
 }
 function trendSetValue(set,metric,unit) {
- if(metric==='duration')return numericSetValue(set.duration);
  if (!set) return null;
+ if(metric==='duration')return numericSetValue(set.duration);
  const rawReps=numericSetValue(set.reps);
  const reps=rawReps!==null&&rawReps>0?rawReps:null;
  if (metric==='reps') return reps;
@@ -350,11 +337,12 @@ function collectActionTrend(action,range,metric,preferredUnit) {
  // 单位切换只影响重量/训练量。默认用最近有记录的单位，未标单位作为独立选项。
  const lastLoaded=allSets.findLast(set=>numericSetValue(set.weight)!==null&&!set.plus);
  const unit=units.includes(preferredUnit)?preferredUnit:(lastLoaded?(lastLoaded.unit||''):(units[0]||''));
- const series=TREND_SETS.map((style,index)=>({...style,values:sessions.map(session=>trendSetValue(session.sets[index],metric,unit))}));
+ const series=trendDisplay==='sets'?TREND_SETS.map((style,index)=>({...style,values:sessions.map(session=>trendSetValue(session.sets[index],metric,unit))})):[{name:metric==='volume'?'当日总训练量':'每次训练最佳组',color:'#91ead0',dash:'',values:sessions.map(session=>{const values=session.sets.map(s=>trendSetValue(s,metric,unit)).filter(n=>n!==null);return values.length?(metric==='volume'?values.reduce((n,x)=>n+x,0):Math.max(...values)):null;})}];
+ const estimates=allSets.filter(s=>s.verified!==false&&!s.plus&&s.unit===unit&&Number.isFinite(s.weight)&&s.weight>0&&Number.isFinite(s.reps)&&s.reps>0&&s.reps<=12).map(s=>s.weight*(1+s.reps/30));
  const eligibleLoads=allSets.map(set=>trendSetValue(set,'weight',unit)).filter(value=>value!==null);
  const recent=sessions.at(-1);
  const recentValues=(recent?.sets||[]).map(set=>trendSetValue(set,'volume',unit)).filter(value=>value!==null);
- return {dates:sessions.map(session=>session.date),series,units,unit,setCount:allSets.length,
+ return {dates:sessions.map(session=>session.date),sessions,estimate:estimates.length?Math.max(...estimates):null,series,units,unit,setCount:allSets.length,
   peak:eligibleLoads.length?Math.max(...eligibleLoads):null,
   lastVolume:{value:recentValues.length?recentValues.reduce((sum,value)=>sum+value,0):null,count:recentValues.length,total:recent?.sets.length||0}
  };
@@ -383,7 +371,7 @@ function trendSvg(data,unit,message) {
  const ticks=[...tickIndexes].filter(index=>{
   if (index!==data.dates.length-1&&(xs[index]-lastTickX<44||xs.at(-1)-xs[index]<45)) return false;
   lastTickX=xs[index];return true;
- }).map(i=>`<text x="${xs[i]}" y="${dateY}" text-anchor="middle">${h(data.dates[i].slice(5).replace('-','/'))}</text>`).join('');
+ }).map(i=>`<text x="${xs[i]}" y="${dateY}" text-anchor="middle">${h(dateLabel(data.dates[i]))}</text>`).join('');
  let lines='',dots='';
  data.series.forEach((line,seriesIndex)=>{
   const segments=[];
@@ -397,29 +385,32 @@ function trendSvg(data,unit,message) {
    const x=xs[i],y=yAt(value);
    points.push(`${x.toFixed(2)},${y.toFixed(2)}`);
    // 外环、中环、实心点可在三组数值完全重合时同时辨认。
-   const radius=[8,5,2.6][seriesIndex];
+   const radius=[6,5,4,3,2.5][seriesIndex];
    const fill=seriesIndex===2?line.color:'#111b2a';
-   dots+=`<circle cx="${x}" cy="${y}" r="${radius}" fill="${fill}" stroke="${line.color}" stroke-width="1.7"/>`;
+   dots+=`<circle data-dot-index="${i}" data-base-radius="${radius}" cx="${x}" cy="${y}" r="${radius}" fill="${fill}" stroke="${line.color}" stroke-width="1.7"/>`;
   });
   if (points.length>1) segments.push(points);
   for (const segment of segments) {
-   lines+=`<path data-line="${seriesIndex+1}" d="M${segment.join(' L')}" fill="none" stroke="${line.color}" stroke-width="${[3.7,2.8,2][seriesIndex]}" stroke-dasharray="${line.dash}" stroke-linecap="round" stroke-linejoin="round"/>`;
+   lines+=`<path data-line="${seriesIndex+1}" d="M${segment.join(' L')}" fill="none" stroke="${line.color}" stroke-width="${[3.2,2.8,2.5,2.2,2][seriesIndex]}" stroke-dasharray="${line.dash}" stroke-linecap="round" stroke-linejoin="round"/>`;
   }
  });
  const hotspots=xs.map((x,i)=>{
   if (data.series.every(line=>line.values[i]===null)) return '';
   const x0=i===0?L-12:(xs[i-1]+x)/2;
   const x1=i===xs.length-1?W-R+12:(x+xs[i+1])/2;
-  const label=`${data.dates[i]} · ${data.series.map(line=>`${line.name} ${line.values[i]??'—'}`).join(' · ')} ${unit}`;
+  const label=`${dateLabel(data.dates[i])} · ${data.series.map(line=>`${line.name} ${line.values[i]??'—'}`).join(' · ')} ${unit}`;
   return `<rect class="trend-hit" data-chart-date="${data.dates[i]}" data-point-index="${i}" x="${x0}" y="${T-9}" width="${x1-x0}" height="${plotH+20}" tabindex="0" role="button" aria-label="${h(label)}"><title>${h(label)}</title></rect>`;
  }).join('');
- return `<svg class="trend-svg" viewBox="0 0 ${W} ${H}" role="group" aria-label="逐组${TREND_METRICS[selectedTrendMetric]}趋势"><g class="trend-axis">${grid}${ticks}</g>${lines}${dots}${hotspots}</svg>`;
+ return `<svg class="trend-svg" viewBox="0 0 ${W} ${H}" role="group" aria-label="逐组${TREND_METRICS[selectedTrendMetric]}趋势"><g class="trend-axis">${grid}${ticks}</g>${lines}${dots}<line id="trendGuide" y1="${T}" y2="${H-B}" stroke="#dcebe9" stroke-dasharray="4 4" visibility="hidden"/>${hotspots}</svg>`;
 }
 function renderTrendReadout(index) {
  const host=document.querySelector('#trendReadout');
  if (!activeTrendData||index<0||!activeTrendData.dates[index]) {host.innerHTML='';return;}
  const {dates,series,suffix}=activeTrendData;
- host.innerHTML=`<time datetime="${dates[index]}">${dates[index]}</time>`+
+ const hits=document.querySelectorAll('#trendChart [data-point-index]'),hit=hits[index],guide=document.getElementById('trendGuide');
+ if(hit&&guide){const x=+hit.getAttribute('x')+(+hit.getAttribute('width'))/2;guide.setAttribute('x1',x);guide.setAttribute('x2',x);guide.setAttribute('visibility','visible');}
+ for(const dot of document.querySelectorAll('[data-dot-index]'))dot.setAttribute('r',+dot.dataset.baseRadius+(+dot.dataset.dotIndex===index?2:0));
+ host.innerHTML=`<time datetime="${dates[index]}">${dateLabel(dates[index])}</time>`+
   series.map(line=>`<span><i style="--set-color:${line.color}"></i>${line.name}<b>${line.values[index]===null?'—':h(fmtNum(line.values[index])+(suffix?' '+suffix:''))}</b></span>`).join('');
 }
 function renderTrendInsights(data) {
@@ -428,6 +419,7 @@ function renderTrendInsights(data) {
   ['训练天数',data.dates.length,'天',''],
   ['完成组数',data.setCount,'组','含第 4 组及以后'],
   ['区间最高重量',data.peak,trendUnitName(unit),''],
+  ['估算 1RM',data.estimate,trendUnitName(unit),'Epley · 仅确认且次数≤12的组'],
   ['最近单日训练量',data.lastVolume.value,unit?`${unit}·次`:'',data.lastVolume.total?`计入 ${data.lastVolume.count}/${data.lastVolume.total} 组 · 重量×次数`:'重量×次数']
  ];
  document.querySelector('#trendInsights').innerHTML=cards.map(([label,value,suffix,detail])=>
@@ -444,13 +436,13 @@ function renderTrend() {
  const unitSelect=document.querySelector('#trendUnits');
  unitSelect.innerHTML=data.units.map(unit=>`<option value="${h(unit)}">${h(trendUnitName(unit))}</option>`).join('');
  unitSelect.value=data.unit;
- unitSelect.hidden=selectedTrendMetric==='reps'||data.units.length<2;
- const metric=selectedTrendMetric,suffix=metric==='reps'?'次':metric==='volume'?(data.unit?`${data.unit}·次`:''):data.unit;
+ unitSelect.hidden=['reps','duration'].includes(selectedTrendMetric)||data.units.length<2;
+ const metric=selectedTrendMetric,suffix=metric==='duration'?'秒':metric==='reps'?'次':metric==='volume'?(data.unit?`${data.unit}·次`:''):data.unit;
  const axisUnit=suffix||trendUnitName(data.unit);
  const title=document.querySelector('#trendChartTitle');
  title.textContent=selected?selected.name:'选择一个动作';
- document.querySelector('#trendChartMetric').textContent=`${TREND_METRICS[metric]}${metric==='reps'?'（次）':`（${axisUnit}）`}`;
- document.querySelector('#trendLegend').innerHTML=TREND_SETS.map((line,index)=>
+ document.querySelector('#trendChartMetric').textContent=`${metric==='volume'?(trendDisplay==='best'?'当日总训练量':'单组训练量'):TREND_METRICS[metric]}${metric==='reps'?'（次）':`（${axisUnit}）`}`;
+ document.querySelector('#trendLegend').innerHTML=data.series.map((line,index)=>
   `<span class="trend-series-${index+1}"><i style="--set-color:${line.color}"></i>${line.name}</span>`).join('');
  const missing=range.invalid?'开始日期应早于或等于结束日期':!selected?'请选择一个动作':
   data.dates.length?`所选${TREND_METRICS[metric]}暂无可比较记录`:'所选时间内暂无逐组记录';
@@ -503,7 +495,7 @@ document.querySelector('#trendUnits').addEventListener('change',event=>{selected
 for (const id of ['trendStart','trendEnd']) document.getElementById(id).addEventListener('change',renderTrend);
 document.querySelector('#trendSearch').addEventListener('input',renderTrend);
 
-/* ================== 模块 F：IndexedDB 照片管理 / 本地日历打卡 ================== */
+
 const DB_NAME='motionlog_images_v1',PHOTO_STORE='photos';let dbPromise=null;
 function openImageDB(){if(!dbPromise)dbPromise=new Promise((resolve,reject)=>{const req=indexedDB.open(DB_NAME,1);req.onupgradeneeded=()=>{if(!req.result.objectStoreNames.contains(PHOTO_STORE))req.result.createObjectStore(PHOTO_STORE);};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});return dbPromise;}
 async function imagePut(id,file){const db=await openImageDB();return new Promise((resolve,reject)=>{const tx=db.transaction(PHOTO_STORE,'readwrite');tx.objectStore(PHOTO_STORE).put(file,id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});}
@@ -514,10 +506,10 @@ let activeDay=today(),calMonth=new Date(Number(today().slice(0,4)),Number(today(
 function makePhotoURL(blob,collection=draftPhotoUrls){const url=URL.createObjectURL(blob);collection.push(url);return url;}
 function releasePhotos(){draftPhotoUrls.forEach(url=>URL.revokeObjectURL(url));draftPhotoUrls=[];}
 function releaseSavedPhotos(){savedPhotoUrls.forEach(url=>URL.revokeObjectURL(url));savedPhotoUrls=[];}
-function chooseDay(day){activeDay=day;document.querySelector('#checkinDate').value=day;document.querySelector('#checkinTitle').textContent=`${day.slice(5).replace('-',' 月 ')} 日 · 打卡`;renderCalendar();renderDayDetails();}
+function chooseDay(day){activeDay=day;document.querySelector('#checkinDate').value=day;document.querySelector('#checkinTitle').textContent=`${dateLabel(day)} · 训练记录`;renderCalendar();renderDayDetails();}
 function renderCalendar(){
  document.querySelector('#monthLabel').textContent=`${calMonth.getFullYear()} 年 ${calMonth.getMonth()+1} 月`;
- const start=calMonth.getDay(),length=new Date(calMonth.getFullYear(),calMonth.getMonth()+1,0).getDate();let markup='';
+ const start=(calMonth.getDay()+6)%7,length=new Date(calMonth.getFullYear(),calMonth.getMonth()+1,0).getDate();let markup='';
  const monthPrefix=`${calMonth.getFullYear()}-${pad(calMonth.getMonth()+1)}`;
  const monthlyRecords=records.filter(r=>r.date?.startsWith(monthPrefix));
  const dayCount=new Set([...monthlyRecords.map(r=>r.date),...Object.keys(checkins).filter(d=>d.startsWith(monthPrefix)&&checkins[d]?.completed)]).size;
@@ -528,7 +520,7 @@ function renderCalendar(){
   const date=`${monthPrefix}-${pad(day)}`,cnt=monthlyRecords.filter(r=>r.date===date).length,ch=checkins[date],checked=isTrainingDay(date),photos=(ch?.photos||[]).length;
   const daySets=monthlyRecords.filter(r=>r.date===date).reduce((n,r)=>n+(r.sets||[]).filter(st=>st&&st.verified===true).length,0);
   const level=daySets>=5?3:daySets>=2?2:cnt||checked?1:0;
-  markup+=`<button type="button" data-day="${date}" class="cal-day level-${level} ${date===today()?'today':''} ${date===activeDay?'selected':''}" title="${date}：${cnt} 项动作${checked?' · 已打卡':''}${photos?' · '+photos+' 张照片':''}"><span class="cal-number">${day}</span><span class="cal-day-flags">${checked?'<span class="cal-check" aria-label="已打卡">✓</span>':''}${photos?'<span class="cal-photo" aria-label="有照片">▣</span>':''}</span><span class="cal-day-bottom">${daySets?`<span class="cal-count">${daySets} 组</span>`:(cnt?`<span class="cal-count">有记录</span>`:'')}</span></button>`;
+  markup+=`<button type="button" data-day="${date}" class="cal-day level-${level} ${date===today()?'today':''} ${date===activeDay?'selected':''}" title="${dateLabel(date)}：${cnt} 项动作${checked?' · 已打卡':''}${photos?' · '+photos+' 张照片':''}"><span class="cal-number">${day}</span><span class="cal-day-flags">${checked?'<span class="cal-check" aria-label="已打卡">✓</span>':''}${photos?'<span class="cal-photo" aria-label="有照片">▣</span>':''}</span><span class="cal-day-bottom">${daySets?`<span class="cal-count">${daySets} 组</span>`:(cnt?`<span class="cal-count">有记录</span>`:'')}</span></button>`;
  }
  document.querySelector('#calendarDays').innerHTML=markup;renderDayDetails();
 }
@@ -541,7 +533,7 @@ document.querySelector('#selectedPhotos').addEventListener('click',e=>{const b=e
 document.querySelector('#checkinForm').addEventListener('submit',async e=>{e.preventDefault();const date=document.querySelector('#checkinDate').value;const text=document.querySelector('#checkinNote').value.trim();if(!date)return toast('请选择日期',true);// 允许只点击按钮完成打卡；感受与图片均为可选内容。
  const old=checkins[date]||{notes:[],photos:[]};const stored=[];try{for(const file of incomingPhotos){const id=UID();await imagePut(id,file);stored.push(id);}}catch(err){for(const id of stored)await imageDelete(id).catch(()=>{});return toast('照片保存失败；请检查浏览器是否允许 IndexedDB',true);}
  checkins[date]={completed:true,notes:[...(old.notes||[]),...(text?[{id:UID(),text,time:Date.now()}]:[])],photos:[...(old.photos||[]),...stored]};try{saveCheckins();}catch{return toast('打卡保存失败，可能是存储空间不足',true);}incomingPhotos=[];document.querySelector('#checkinNote').value='';renderIncomingPhotos();syncTrainingViews();if(!old.completed)celebrateCheckin();toast('打卡成功');});
-async function renderDayDetails(){const requestIndex=++dayRenderIndex;releaseSavedPhotos();const day=activeDay,host=document.querySelector('#dayDetails');const r=records.filter(x=>x.date===day),ch=checkins[day]||{notes:[],photos:[]};let txt=(ch.completed?'<div class="checkin-item"><b style="color:var(--mint)">✓ 当日已打卡</b> <button class="btn btn-small btn-ghost" data-undo-checkin style="margin-left:12px">撤销打卡</button></div>':'')+workoutGroupsForDate(day).map(group=>`<div class="checkin-item day-calendar-muscle"><b>${h(group.muscle)}</b>${group.actions.map(action=>`<div class="day-calendar-action"><strong>${h(action.name)}</strong>${action.sets.map((part,i)=>`<div class="day-calendar-set"><small>${part.legacy?'重量参考':`第 ${pad(action.sets.slice(0,i+1).filter(x=>!x.legacy).length)} 组`}</small><span>${quickSetText(part.set)}</span></div>`).join('')}</div>`).join('')}</div>`).join('')+(ch.notes||[]).map(n=>`<div class="checkin-item"><small>${new Date(n.time).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}</small><p>${h(n.text)}</p><button class="btn btn-small btn-danger" data-del-note="${h(n.id)}">删除这条感受</button></div>`).join('');txt+=`<div class="photo-grid" id="storedPhotoGrid"></div>`;host.innerHTML=txt||'<div class="subtle" style="font-size:12px">这天还没有记录。</div>';if(!r.length&&!ch.notes?.length&&!ch.photos?.length&&!ch.completed)host.innerHTML='<div class="subtle" style="font-size:12px">这天还没有记录。</div>';
+async function renderDayDetails(){const requestIndex=++dayRenderIndex;releaseSavedPhotos();const day=activeDay,host=document.querySelector('#dayDetails');const r=records.filter(x=>x.date===day),ch=checkins[day]||{notes:[],photos:[]};let txt=(isTrainingDay(day)?'<div class="checkin-item"><b style="color:var(--mint)">✓ 当日已打卡</b> <button class="btn btn-small btn-ghost" data-undo-checkin style="margin-left:12px">撤销打卡</button></div>':'')+workoutGroupsForDate(day).map(group=>`<div class="checkin-item day-calendar-muscle"><b>${h(group.muscle)}</b>${group.actions.map(action=>`<div class="day-calendar-action"><strong>${h(action.name)}</strong>${action.sets.map((part,i)=>`<div class="day-calendar-set"><small>${part.legacy?'重量参考':`第 ${pad(action.sets.slice(0,i+1).filter(x=>!x.legacy).length)} 组`}</small><span>${quickSetText(part.set)}</span></div>`).join('')}</div>`).join('')}</div>`).join('')+(ch.notes||[]).map(n=>`<div class="checkin-item"><small>${new Date(n.time).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})}</small><p>${h(n.text)}</p><button class="btn btn-small btn-danger" data-del-note="${h(n.id)}">删除这条感受</button></div>`).join('');txt+=`<div class="photo-grid" id="storedPhotoGrid"></div>`;host.innerHTML=txt||'<div class="subtle" style="font-size:12px">这天还没有记录。</div>';if(!r.length&&!ch.notes?.length&&!ch.photos?.length&&!ch.completed)host.innerHTML='<div class="subtle" style="font-size:12px">这天还没有记录。</div>';
  const grid=document.querySelector('#storedPhotoGrid');if(!grid)return;const photos=[];
  for(const id of (ch.photos||[])){try{const photo=await imageGet(id);if(photo)photos.push({id,photo});}catch{}}
  // IndexedDB 是异步的；旧请求结束时不能覆盖新选中日期的内容。
@@ -549,7 +541,7 @@ async function renderDayDetails(){const requestIndex=++dayRenderIndex;releaseSav
  grid.innerHTML=photos.map(({id,photo})=>`<div class="photo-wrap"><img src="${makePhotoURL(photo,savedPhotoUrls)}" alt="当天打卡照片"><button type="button" data-del-photo="${h(id)}" aria-label="删除照片">×</button></div>`).join('');}
 document.querySelector('#dayDetails').addEventListener('click',async e=>{const note=e.target.closest('[data-del-note]'),photo=e.target.closest('[data-del-photo]'),undo=e.target.closest('[data-undo-checkin]');if(!note&&!photo&&!undo)return;if(!confirm('删除这项打卡内容？'))return;const ch=checkins[activeDay];if(!ch)return;if(undo)ch.completed=false;if(note)ch.notes=ch.notes.filter(x=>x.id!==note.dataset.delNote);if(photo){await imageDelete(photo.dataset.delPhoto).catch(()=>{});ch.photos=ch.photos.filter(x=>x!==photo.dataset.delPhoto);}if(!ch.notes.length&&!ch.photos.length&&!ch.completed)delete checkins[activeDay];saveCheckins();syncTrainingViews();});
 
-/* ================== 模块 G：完整备份（包含图片）与恢复 ================== */
+
 function blobAsDataURL(blob){return new Promise((resolve,reject)=>{const rd=new FileReader();rd.onload=()=>resolve(rd.result);rd.onerror=reject;rd.readAsDataURL(blob);});}
 async function exportData(){const b=document.querySelector('#exportBtn');b.disabled=true;b.textContent='正在准备备份…';try{const photoIds=[...new Set(Object.values(checkins).flatMap(ch=>ch.photos||[]))],images={};for(const id of photoIds){try{const blob=await imageGet(id);if(blob)images[id]=await blobAsDataURL(blob);}catch{}}
  const payload={app:'MotionLog',version:1,exportedAt:new Date().toISOString(),records,checkins,images,gifBindings};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`motionlog-backup-${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);toast('已生成完整 JSON 备份');}catch(e){toast('备份失败：'+e.message,true);}finally{b.disabled=false;b.textContent='导出备份';}}
@@ -566,8 +558,7 @@ document.querySelector('#importFile').addEventListener('change',async e=>{
    throw Error('不是有效的 MotionLog v1 备份');
   }
   if (!confirm(`从备份恢复 ${backup.records.length} 条训练记录？将覆盖当前训练与打卡记录。`)) return;
-  // 旧备份缺少补录标记，恢复前先合并。新版备份已记录本批导入状态，可保留用户的后续增删。
-  
+    
   for (const [id,src] of Object.entries(backup.images||{})) {
    if (typeof src==='string'&&src.startsWith('data:')) await imagePut(id,dataURLtoBlob(src));
   }
@@ -578,7 +569,7 @@ document.querySelector('#importFile').addEventListener('change',async e=>{
   
   if (backup.gifBindings&&typeof backup.gifBindings==='object'&&!Array.isArray(backup.gifBindings)) {
    gifBindings=backup.gifBindings;
-   localStorage.setItem(GIF_BINDINGS_KEY,JSON.stringify(gifBindings));
+   saveGifBindings();
    renderCatalogPreview();
   }
   syncTrainingViews();
@@ -588,10 +579,7 @@ document.querySelector('#importFile').addEventListener('change',async e=>{
  }
 });
 
-/* ================== 模块 I：本地中英双语常见动作选择器 ==================
-   此列表是标准动作中文/英文对照，不依赖 GIF 库的连通性。
-   请注意用户的原始口语动作名称（如“背拉”“侧提”）存在歧义，不做不可靠的自动替换。
-   在线演示仅在能够可靠找到对应英文动作时展示，避免错误 GIF。 */
+
 const ACTION_GROUPS={
  '背部':[
   ['高位下拉','Lat Pulldown','器械'],['窄握高位下拉','Close-Grip Lat Pulldown','器械'],['坐姿划船','Seated Cable Row','绳索'],['坐姿器械划船','Seated Machine Row','器械'],['单臂器械划船','Single-Arm Machine Row','器械'],['单臂哑铃划船','One-Arm Dumbbell Row','哑铃'],['俯身哑铃划船','Bent-Over Dumbbell Row','哑铃'],['胸托哑铃划船','Chest-Supported Dumbbell Row','训练凳'],['杠铃俯身划船','Barbell Bent-Over Row','杠铃'],['T 杠划船','T-Bar Row','器械'],['直臂下压','Straight-Arm Pulldown','绳索'],['辅助引体向上','Assisted Pull-Up','器械'],['引体向上','Pull-Up','自重'],['哑铃耸肩','Dumbbell Shrug','哑铃']],
@@ -630,21 +618,11 @@ function renderCatalog(){
  document.querySelector('#libraryCount').textContent=`${results.length} 个动作`;
  document.querySelector('#catalogList').innerHTML=results.length?results.map((a,i)=>`<button type="button" class="catalog-action ${catalogSelected?.zh===a.zh?'selected':''}" data-action="${h(a.zh)}"><span class="catalog-index">${pad(i+1)}</span><span class="catalog-copy"><b>${h(a.zh)}</b><small>${h(a.en)} · ${h(a.equipment)}</small></span><span class="catalog-arrow">＋</span></button>`).join(''):'<div class="empty-state">没有匹配动作。你仍可直接在左侧输入名称。</div>';
 }
-/* ================== 模块 I.1：动作演示的语义安全匹配 ==================
-   以前的规则会按照共同关键词打分，只要达到一个很低的阈值就显示 GIF。
-   例如“坐姿划船”与“坐姿高位下拉”可能同时含有 seated、cable、back，
-   所以出现了“选择划船，却播放下拉动作”的错误。
 
-   新规则：
-   1. 以动作核心类别为硬约束：row / pulldown / press 等绝不能互相替代；
-   2. 以器械和姿势修饰词为硬约束，拒绝关键修饰词缺失/冲突；
-   3. 允许英文名称的词序变化，例如 Seated Cable Row 与 Cable Seated Row；
-   4. 未找到可靠对应素材则不显示 GIF，不猜测；
-   5. 用户可以手动浏览同类 GIF 并保存明确选择，优先级高于自动匹配。
-   外部图库只用于显示动作，不影响训练历史和记录。 */
 const GIF_BINDINGS_KEY='motionlog_gif_bindings_v1';
 let gifBindings=readJSON(GIF_BINDINGS_KEY,{});
 if(!gifBindings||typeof gifBindings!=='object'||Array.isArray(gifBindings))gifBindings={};
+let saveGifBindings=()=>localStorage.setItem(GIF_BINDINGS_KEY,JSON.stringify(gifBindings));
 let choosingCatalogGif=false;
 
 /* 对英文表达做统一化处理，避免词序、连字符、单复数造成误判。 */
@@ -812,13 +790,13 @@ document.querySelector('#catalogList').addEventListener('click',e=>{const b=e.ta
 document.querySelector('#catalogPreview').addEventListener('click',e=>{
  if(e.target.closest('[data-use-selected]'))return;
  if(e.target.closest('[data-toggle-gif-picker]')){choosingCatalogGif=!choosingCatalogGif;renderCatalogPreview();return;}
- if(e.target.closest('[data-remove-gif]')){delete gifBindings[gymActionKey(catalogSelected)];localStorage.setItem(GIF_BINDINGS_KEY,JSON.stringify(gifBindings));renderCatalogPreview();return;}
+ if(e.target.closest('[data-remove-gif]')){delete gifBindings[gymActionKey(catalogSelected)];saveGifBindings();renderCatalogPreview();return;}
  const picked=e.target.closest('[data-gif-id]');
  if(!picked||!catalogSelected||!exerciseDatabase)return;
  const candidate=catalogGifCandidates(catalogSelected).find(item=>String(item.id)===picked.dataset.gifId);
  if(!candidate)return;
  gifBindings[gymActionKey(catalogSelected)]={id:candidate.id,name:candidate.name};
- localStorage.setItem(GIF_BINDINGS_KEY,JSON.stringify(gifBindings));
+ saveGifBindings();
  choosingCatalogGif=false;
  renderCatalogPreview();
 });
@@ -829,9 +807,7 @@ document.querySelector('#todayCheckin').addEventListener('click',()=>{const d=to
 document.querySelector('#dayNewWorkout').addEventListener('click',()=>{openEditor(null,selectedRegion);document.querySelector('#trainDate').value=activeDay;});
 
 
-/* ================== V6：快速录入、每日打卡及弹窗协调 ==================
-   复用 records/checkins、历史筛选与 IndexedDB 图片存储，不引入新依赖。
-   新首页的“记录这一组”会将相同日期 + 肌群 + 动作的快捷记录合并到逐组数组中。 */
+
 let mlActiveOverlay=null,mlReturnFocus=null;
 function openOverlay(id){
  const node=document.getElementById(id);if(!node)return;
@@ -896,9 +872,7 @@ function renderQuickDayGroups(date,hostId){
  }).join('')}</div></section>`).join('');
 }
 
-/* ================== 模块 K：按肌群回看上一次训练 ==================
-   现有记录以训练日期为单位。只查早于当前录入日期的同肌群记录，
-   同一天同一动作下的每一组都保留，旧重量参考单独标明。 */
+
 const lastWorkoutTargets = new Map([
  ['哑铃侧平举','三角肌中束'], ['器械侧平举','三角肌中束'], ['绳索侧平举','三角肌中束'],
  ['哑铃前平举','三角肌前束'], ['前平举','三角肌前束'], ['肩上推举','三角肌前束 / 中束'],
@@ -921,7 +895,7 @@ function renderLastWorkout() {
  const dayLabel = document.getElementById('lastWorkoutDate');
  const summary = document.getElementById('lastWorkoutSummary');
  const body = document.getElementById('lastWorkoutBody');
- dayLabel.textContent = lastWorkoutDay;
+ dayLabel.textContent = dateLabel(lastWorkoutDay);
  dayLabel.dateTime = lastWorkoutDay;
  if (!lastWorkoutDay) {
   summary.textContent = muscle;
@@ -982,7 +956,7 @@ function refreshQuickHome(){
  const date=document.getElementById('quickDate').value||today();
  const chosen=records.filter(r=>r.date===date);
  const count=chosen.reduce((sum,r)=>sum+(r.sets||[]).filter(s=>s.verified!==false).length,0);
- document.getElementById('quickLogHeading').textContent=date===today()?'今日训练':date.slice(5).replace('-',' / ')+' 训练';
+ document.getElementById('quickLogHeading').textContent=date===today()?'今日训练':dateLabel(date)+' 训练';
  document.getElementById('quickLogCount').textContent=`${count} 组`;
  renderQuickDayGroups(date,'quickTodayList');
  renderLastWorkout();
@@ -996,7 +970,7 @@ function refreshQuickHome(){
 }
 function syncTrainingViews(){
  // 无论从首页、详细弹窗、月历完成打卡，都统一刷新全部可见视图。
- renderDashboard();renderHistory();renderCalendar();refreshQuickHome();
+ renderDashboard();renderHistory();renderCalendar();refreshQuickHome();document.dispatchEvent(new Event('motion:data-changed'));
 }
 document.getElementById('quickDate').value=today();
 document.getElementById('quickMuscle').innerHTML=MUSCLE_NAMES.map(x=>`<option value="${h(x)}">${h(x)}</option>`).join('');
@@ -1027,18 +1001,14 @@ document.getElementById('quickForm').addEventListener('submit',e=>{
  try{saveRecords();}catch(err){if(existing)existing.sets.pop();else records.pop();return toast('本地空间不足，训练未保存',true);}
  
  syncTrainingViews();renderRecentActionChips();
+ window.RestTimer?.start();
  toast('已记录 1 组',false,()=>{for(const r of records)r.sets=r.sets.filter(set=>set.id!==s.id);records=records.filter(r=>r.sets.length);saveRecords();syncTrainingViews();});document.getElementById('quickReps').focus();document.getElementById('quickReps').select();
 });
 document.getElementById('quickTodayList').addEventListener('click',e=>{const b=e.target.closest('[data-quick-edit]');if(b)openEditor(b.dataset.quickEdit);const del=e.target.closest('[data-remove-set]');if(del)removeTrainingRecord(del.dataset.removeSet,+del.dataset.setIndex);});
-document.getElementById('quickShowInsights').addEventListener('click',()=>{renderDashboard();openOverlay('insightsOverlay');});
 document.getElementById('quickGoHistory').addEventListener('click',()=>showView('history'));
 document.getElementById('quickPhoto').addEventListener('click',()=>openOverlay('quickCheckinOverlay'));
 
-/* ================== 模块 J：打卡成功礼花 / 彩纸 ==================
-   1. 仅在成功写入本地打卡状态后触发；首次完成打卡才庆祝。
-   2. 原生 Canvas，无外部库、不修改已有记录或统计功能。
-   3. 限制帧数、粒子数量和持续时间；离屏或销毁时主动清理。
-   4. 尊重 prefers-reduced-motion，静态反馈代替高速运动。 */
+
 let celebrationCleanup=null;
 function celebrateCheckin(){
   // 如果动画还在播放，先清理上一次，防止节点和 requestAnimationFrame 累积。
@@ -1155,7 +1125,7 @@ document.getElementById('historyList').addEventListener('click',()=>setTimeout(r
 refreshQuickHome();
 
 /* 页面初始化：先将 CRUD/旧记录功能启动；Three.js 使用另一个 ES module 加载 */
-initFormFields();document.querySelector('#clockDate').textContent=new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'long',day:'numeric',weekday:'short'}).format(new Date());
+initFormFields();
 document.querySelector('#heroDate').textContent=new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric',weekday:'long'}).format(new Date());renderDashboard();renderHistory();document.querySelector('#checkinDate').value=today();chooseDay(today());catalogMuscle='背部';renderCatalog();renderRecentActionChips();showView('dashboard');
 // CDN 可能被浏览器扩展或离线环境阻断；超时后给出明确提示，而不是永久显示加载中。
 
@@ -1172,3 +1142,9 @@ document.getElementById('historyList').addEventListener('click',e=>{const b=e.ta
 
 document.getElementById('historyList').addEventListener('click',e=>{if(e.target.closest('#loadMoreDays')){historyDayLimit+=20;renderHistory();}});
 document.getElementById('historyList').addEventListener('toggle',e=>{if(e.target.dataset?.historyDay)historyExpandedDays.set(e.target.dataset.historyDay,e.target.open);},true);
+
+document.getElementById('trendDisplay').addEventListener('click',e=>{const b=e.target.closest('[data-trend-display]');if(!b)return;trendDisplay=b.dataset.trendDisplay;for(const button of document.querySelectorAll('[data-trend-display]'))button.setAttribute('aria-pressed',String(button===b));renderTrend();});
+
+window.RestTimer?.configure({getPrefs:()=>appPreferences.restTimer,savePrefs:prefs=>{appPreferences.restTimer=prefs;savePreferences();},mount:'.quick-capture',onError:error=>toast('计时设置保存失败',true)});
+function mountTimerSettings(){const host=document.getElementById('motionSettingsExtras');if(!host||document.getElementById('restDefault'))return;const label=document.createElement('label');label.textContent='默认组间休息 ';const select=document.createElement('select');select.id='restDefault';for(const seconds of [60,90,120]){const option=document.createElement('option');option.value=seconds;option.textContent=seconds+' 秒';select.append(option);}select.value=window.RestTimer.getPrefs().duration;select.onchange=()=>window.RestTimer.setPrefs({duration:+select.value});label.append(select);host.append(label);const sound=document.createElement('label');const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=window.RestTimer.getPrefs().sound;toggle.onchange=()=>window.RestTimer.setPrefs({sound:toggle.checked});sound.append(toggle,' 休息结束提示音');host.append(sound);}
+window.addEventListener('motion:layout-ready',mountTimerSettings);

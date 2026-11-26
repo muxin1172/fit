@@ -22,7 +22,7 @@
   </nav>
 </aside>
 <main class="main">
-  <div class="topbar"><div class="crumb">个人空间 <span> / 训练中心</span></div><div class="top-actions"><span class="today-label" id="clockDate"></span><button class="btn btn-ghost btn-small" id="exportBtn">导出备份</button><button class="btn btn-primary btn-small" id="quickAdd">＋ 记录训练</button></div></div>
+  <div class="topbar"><div class="crumb">个人空间 <span> / 训练中心</span></div><div class="top-actions"><button class="btn btn-ghost btn-small" id="exportBtn">导出备份</button><button class="btn btn-primary btn-small" id="quickAdd">＋ 记录训练</button></div></div>
   
   
   <section id="dashboard" class="view active">
@@ -33,7 +33,7 @@
       </header>
       <div class="quick-workspace">
       <section class="quick-capture" aria-label="快速记录一组训练">
-        <div class="quick-heading"><div><div class="panel-kicker">QUICK LOG</div><h2>记录这一组</h2></div><div class="quick-date-wrap"><label class="sr-only" for="quickDate">训练日期</label><input id="quickDate" type="date" aria-label="快速训练记录日期"></div></div>
+        <div class="quick-heading"><div><h2>记录这一组</h2></div><div class="quick-date-wrap"><label class="sr-only" for="quickDate">训练日期</label><input id="quickDate" type="date" aria-label="快速训练记录日期"></div></div>
         <form id="quickForm">
           <div class="quick-muscle-first"><label for="quickMuscle">今天练哪个部位？</label><div class="quick-muscle-controls"><select id="quickMuscle" aria-label="选择训练肌群"></select><a class="btn btn-small btn-ghost last-workout-jump" href="#lastWorkoutPanel">上次记录</a></div></div>
           <div class="quick-action-head"><label for="quickAction">动作</label></div>
@@ -59,14 +59,14 @@
         <div class="quick-checkin-copy"><div class="quick-checkin-dot" id="quickCheckinDot">✓</div><div><h2 id="quickCheckinTitle">结束训练</h2><p id="quickCheckinSub"></p></div></div>
         <div class="quick-checkin-actions"><button type="button" id="quickPhoto" class="quick-photo" aria-haspopup="dialog">＋ 照片 / 感受</button><button type="button" id="quickCheckinBtn" class="quick-checkin-btn">结束训练</button></div>
       </section>
-      <div class="quick-links" aria-label="其他功能"><button type="button" id="quickShowInsights">训练概览 <span>↗</span></button><button type="button" id="quickGoHistory">数据趋势 <span>↗</span></button></div>
+      <div class="quick-links" aria-label="其他功能"><button type="button" id="quickGoHistory">数据趋势 <span>↗</span></button></div>
     </div>
   </section>
   
   <div class="ml-overlay" id="pickerOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="pickerDialogTitle">
-    <div class="ml-dialog ml-dialog-picker"><div class="ml-dialog-top"><div><div class="panel-kicker">EXERCISES</div><h2 id="pickerDialogTitle">选择训练动作</h2></div><button class="ml-close" type="button" data-close-overlay="pickerOverlay" aria-label="关闭动作选择器">×</button></div>
+    <div class="ml-dialog ml-dialog-picker"><div class="ml-dialog-top"><div><h2 id="pickerDialogTitle">选择训练动作</h2></div><button class="ml-close" type="button" data-close-overlay="pickerOverlay" aria-label="关闭动作选择器">×</button></div>
     <aside aria-label="中英双语训练动作库" class="panel library-panel">
-<div class="panel-head"><div><div class="panel-kicker">EXERCISE PICKER</div><h2>快速选择动作</h2></div><span class="library-count" id="libraryCount"></span></div>
+<div class="panel-head"><div><h2>快速选择动作</h2></div><span class="library-count" id="libraryCount"></span></div>
 <p class="library-desc">选部位，再按器械筛选；点击动作即可填入左侧。</p>
 <div class="catalog-muscles" id="catalogMuscles"></div>
 <input aria-label="搜索训练动作" class="catalog-search" id="catalogSearch" placeholder="查动作 / 中文 / English …"/>
@@ -78,9 +78,8 @@
     </div>
   </div>
   <div class="ml-overlay" id="advancedOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="formTitle">
-    <div class="ml-dialog ml-dialog-advanced compact-advanced"><div class="ml-dialog-top"><div><h2>编辑训练</h2></div><button type="button" class="ml-close" data-close-overlay="advancedOverlay" aria-label="关闭详细记录">×</button></div>
+    <div class="ml-dialog ml-dialog-advanced compact-advanced"><div class="ml-dialog-top"><div><h2 id="formTitle">记录训练</h2></div><button type="button" class="ml-close" data-close-overlay="advancedOverlay" aria-label="关闭详细记录">×</button></div>
       <div class="entry-layout" id="entryArea"><section aria-label="训练记录表单" class="panel form-panel entry-panel">
-<div class="panel-head entry-heading"><div><div class="panel-kicker">WORKOUT ENTRY</div><h2 id="formTitle">记录一次训练</h2></div><span class="entry-dot">● 保存后仅存本地</span></div>
 <form id="trainingForm">
 <div class="field-row"><div class="field"><label for="trainDate">训练日期</label><input id="trainDate" required="" type="date"/></div><div class="field"><label for="trainMuscle">训练部位</label><select id="trainMuscle"></select></div></div>
 <div class="field action-field"><label for="trainName">动作名称</label><input autocomplete="off" id="trainName" list="recentActions" maxlength="90" placeholder="搜索或输入动作，如：高位下拉、Dumbbell Row" required=""><datalist id="recentActions"></datalist><small class="history-set-note" id="trainSourceName" hidden></small></div>
@@ -93,13 +92,8 @@
 </section></div>
     </div>
   </div>
-  <div class="ml-overlay" id="insightsOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="insightsDialogTitle">
-    <div class="ml-dialog ml-dialog-insights"><div class="ml-dialog-top"><div><div class="panel-kicker">OVERVIEW</div><h2 id="insightsDialogTitle">训练概览</h2></div><button class="ml-close" type="button" data-close-overlay="insightsOverlay" aria-label="关闭训练概览">×</button></div>
-      <div class="dashboard-stats stat-strip"><div class="stat"><div class="stat-label">活跃日</div><div class="stat-value" id="statDays">—</div><div class="stat-footer">已知日期</div></div><div class="stat"><div class="stat-label">已记录动作</div><div class="stat-value" id="statExercises">—</div><div class="stat-footer">含历史导入</div></div><div class="stat"><div class="stat-label">确认组数</div><div class="stat-value" id="statSets">—</div><div class="stat-footer">旧记录未计入</div></div><div class="stat"><div class="stat-label">训练肌群</div><div class="stat-value" id="statMuscles">—<small>/ 8</small></div><div class="stat-footer">持续覆盖全身</div></div></div><div class="bottom-grid"><section class="panel recent-panel"><div class="panel-head"><h2>最近的训练</h2><button class="btn btn-small btn-ghost" data-jump="history">查看全部</button></div><div class="recent-list" id="recentList"></div></section><section class="panel distribution-panel"><div class="panel-head"><h2>肌群训练分布</h2><small class="subtle">按已确认的训练组数</small></div><div class="bars" id="distribution"></div><div class="panel-footer-note">仅统计明确记录的训练组；旧记录组数未知时不纳入。</div></section></div>
-    </div>
-  </div>
   <div class="ml-overlay" id="quickCheckinOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="quickCheckinDialogTitle">
-    <div class="ml-dialog ml-dialog-photo"><div class="ml-dialog-top"><div><div class="panel-kicker">DAILY JOURNAL</div><h2 id="quickCheckinDialogTitle">照片与感受</h2></div><button class="ml-close" type="button" data-close-overlay="quickCheckinOverlay" aria-label="关闭照片弹窗">×</button></div>
+    <div class="ml-dialog ml-dialog-photo"><div class="ml-dialog-top"><div><h2 id="quickCheckinDialogTitle">照片与感受</h2></div><button class="ml-close" type="button" data-close-overlay="quickCheckinOverlay" aria-label="关闭照片弹窗">×</button></div>
       <form id="quickPhotoForm"><label class="quick-photo-label" for="quickNote">今天的感受 <small>可选</small></label><textarea id="quickNote" rows="3" placeholder="今天有什么进步？"></textarea><label class="quick-photo-upload" for="quickFiles">＋ 上传照片 <small>支持多张图片</small><input type="file" id="quickFiles" accept="image/*" multiple></label><div id="quickFilePreviews" class="quick-file-previews"></div><button type="submit" class="quick-save" id="quickSavePhoto">保存并打卡</button></form>
     </div>
   </div>
@@ -109,9 +103,9 @@
     
     <div class="analytics-intro"><span class="eyebrow">ACTIVITY OVERVIEW</span><h2>训练概览</h2></div>
     <div class="analytics-grid">
-      <section class="panel analytics-panel" aria-labelledby="weekChartTitle"><div class="panel-head"><div><div class="panel-kicker">LAST 12 WEEKS</div><h2 id="weekChartTitle">每周活跃日</h2></div><span class="chart-legend-dot"><i></i>训练 / 打卡</span></div>
+      <section class="panel analytics-panel" aria-labelledby="weekChartTitle"><div class="panel-head"><div><h2 id="weekChartTitle">每周活跃日</h2></div><span class="chart-legend-dot"><i></i>训练 / 打卡</span></div>
         <div id="weeklyActivityChart" class="weekly-chart"></div><p class="chart-footnote">有训练或已打卡的日期计 1 天。</p></section>
-      <section class="panel analytics-panel" aria-labelledby="muscleChartTitle"><div class="panel-head"><div><div class="panel-kicker">TRAINING MIX</div><h2 id="muscleChartTitle">训练肌群分布</h2></div><span class="chart-subtitle">按已确认训练组数</span></div>
+      <section class="panel analytics-panel" aria-labelledby="muscleChartTitle"><div class="panel-head"><div><h2 id="muscleChartTitle">训练肌群分布</h2></div><span class="chart-subtitle">按已确认训练组数</span></div>
         <div id="muscleOverviewChart" class="muscle-overview-chart"></div><p class="chart-footnote">旧记录没有可靠组数时不计入。</p></section>
     </div>
     <section class="panel trend-visual-panel" aria-labelledby="trendTitle">
@@ -132,7 +126,7 @@
         <div class="trend-charts-area">
           <div class="visual-chart-card trend-chart-card">
             <div class="trend-toolbar">
-              <div id="trendMetrics" class="segmented-control" role="group" aria-label="趋势指标">
+              <div class="segmented-control" id="trendDisplay" role="group" aria-label="趋势展示方式"><button type="button" data-trend-display="best" aria-pressed="true">最佳组</button><button type="button" data-trend-display="sets" aria-pressed="false">逐组</button></div><div id="trendMetrics" class="segmented-control" role="group" aria-label="趋势指标">
                 <button type="button" data-trend-metric="weight" aria-pressed="true">重量</button>
                 <button type="button" data-trend-metric="reps" aria-pressed="false">次数</button>
                 <button type="button" data-trend-metric="duration" aria-pressed="false">时长</button><button type="button" data-trend-metric="volume" aria-pressed="false">训练量</button>
@@ -169,14 +163,15 @@
   
   <section id="checkin" class="view"><div class="page-head"><div><div class="eyebrow">DAILY TRACKER</div><h1>训练日历</h1></div><button class="btn btn-primary" id="todayCheckin">回到今天</button></div>
     <div class="checkin-overview" id="checkinStats"></div>
-    <div class="calendar-layout"><section class="panel calendar-panel"><div class="calendar-top"><button class="btn btn-small" id="prevMonth" aria-label="上个月"><span class="nav-chevron left"></span></button><h2 id="monthLabel">—</h2><button class="btn btn-small" id="nextMonth" aria-label="下个月"><span class="nav-chevron right"></span></button></div><div class="calendar-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div><div class="calendar-days" id="calendarDays"></div><div class="cal-color-legend"><span><i class="legend-swatch base"></i>未记录</span><span><i class="legend-swatch trained"></i>有训练</span><span><i class="legend-swatch completed"></i>已打卡</span><span><i class="legend-swatch photo"></i>有照片</span></div></section>
-      <div class="view-stack"><section class="panel aside-panel checkin-form-panel"><div class="panel-head"><h2 id="checkinTitle">当天打卡</h2><span class="checkin-marker">PHOTO JOURNAL</span></div><form id="checkinForm"><div class="field"><label for="checkinDate">选择日期</label><input type="date" id="checkinDate" required></div><div class="field" style="margin-top:14px"><label for="checkinNote">备注</label><textarea id="checkinNote" placeholder="今天的感受（可选）" rows="2"></textarea></div><div class="field" style="margin-top:13px"><label>训练照片（可选，支持多张）</label><label class="checkin-cover" for="checkinPhotos"><span>＋ 添加训练照片</span><small>照片保存在当前浏览器</small><input type="file" id="checkinPhotos" accept="image/*" multiple></label></div><div class="photo-grid" id="selectedPhotos"></div><div class="form-actions"><button class="btn btn-primary" type="submit">✓ 完成当日打卡</button></div></form></section><section class="panel aside-panel daily-detail"><div class="panel-head"><h2>当日训练</h2><button class="btn btn-small btn-ghost" id="dayNewWorkout">＋ 记动作</button></div><div id="dayDetails"></div></section></div>
+    <div class="calendar-layout"><section class="panel calendar-panel"><div class="calendar-top"><button class="btn btn-small" id="prevMonth" aria-label="上个月"><span class="nav-chevron left"></span></button><h2 id="monthLabel">—</h2><button class="btn btn-small" id="nextMonth" aria-label="下个月"><span class="nav-chevron right"></span></button></div><div class="calendar-week"><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span></div><div class="calendar-days" id="calendarDays"></div><div class="cal-color-legend"><span><i class="legend-swatch base"></i>未记录</span><span><i class="legend-swatch trained"></i>有训练</span><span><i class="legend-swatch completed"></i>已打卡</span><span><i class="legend-swatch photo"></i>有照片</span></div></section>
+      <div class="view-stack"><section class="panel aside-panel checkin-form-panel"><div class="panel-head"><h2 id="checkinTitle">当天打卡</h2></div><form id="checkinForm"><div class="field"><label for="checkinDate">选择日期</label><input type="date" id="checkinDate" required></div><div class="field" style="margin-top:14px"><label for="checkinNote">备注</label><textarea id="checkinNote" placeholder="今天的感受（可选）" rows="2"></textarea></div><div class="field" style="margin-top:13px"><label>训练照片（可选，支持多张）</label><label class="checkin-cover" for="checkinPhotos"><span>＋ 添加训练照片</span><small>照片随当前账号同步；未登录时保存在本机</small><input type="file" id="checkinPhotos" accept="image/*" multiple></label></div><div class="photo-grid" id="selectedPhotos"></div><div class="form-actions"><button class="btn btn-primary" type="submit">✓ 完成当日打卡</button></div></form></section><section class="panel aside-panel daily-detail"><div class="panel-head"><h2>当日训练</h2><button class="btn btn-small btn-ghost" id="dayNewWorkout">＋ 记动作</button></div><div id="dayDetails"></div></section></div>
     </div>
   </section>
   <input type="file" id="importFile" class="import-file" accept="application/json,.json" />
 </main></div><div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="rest-timer.js"></script>
 <script src="app.js"></script>
+<script src="sync.js"></script>
 
 </body>
 </html>
-<script src="sync.js"></script>
