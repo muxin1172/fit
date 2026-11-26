@@ -28,12 +28,12 @@ let savePreferences=()=>localStorage.setItem(PREFERENCES_KEY,JSON.stringify(appP
 let lastQuickAction='';
 function saveQuickUnit(){const name=document.getElementById('quickAction').value.trim(),muscle=document.getElementById('quickMuscle').value,unit=document.getElementById('quickUnit').value;appPreferences.actionUnits={...(appPreferences.actionUnits||{}),[muscle+'|'+name]:unit};appPreferences.lastUnit=unit;savePreferences();}
 function prefillQuickAction(){
- const name=document.getElementById('quickAction').value.trim();if(name===lastQuickAction)return;lastQuickAction=name;
- syncQuickActionMuscle();const muscle=document.getElementById('quickMuscle').value,date=document.getElementById('quickDate').value||today();
+ const name=document.getElementById('quickAction').value.trim();
+ syncQuickActionMuscle();const muscle=document.getElementById('quickMuscle').value,date=document.getElementById('quickDate').value||today();const context=[name,muscle,date].join('|');if(context===lastQuickAction)return;lastQuickAction=context;
  const matching=records.filter(r=>r.name===name&&r.muscle===muscle&&r.date<=date).sort((a,b)=>byDate(a,b,true));
  const first=matching[0]?.sets?.find(s=>s.verified!==false);
  document.getElementById('quickWeight').value=first?.weight??'';document.getElementById('quickReps').value=first?.reps??'';
- document.getElementById('quickUnit').value=appPreferences.actionUnits?.[muscle+'|'+name]??first?.unit??appPreferences.lastUnit??'lb';
+ document.getElementById('quickUnit').value=first?.unit??appPreferences.actionUnits?.[muscle+'|'+name]??appPreferences.lastUnit??'lb';
  if(document.getElementById('quickDuration'))document.getElementById('quickDuration').value=first?.duration??'';
  renderLastWorkout();
 }
@@ -54,10 +54,11 @@ function requestConfirmation(message,onConfirm,actionLabel='确认删除'){
  (document.querySelector('.ml-overlay:not([hidden]) .ml-dialog')||document.body).append(bar);no.focus({preventScroll:true});
 }
 function removeTrainingRecord(id,setIndex=null){
- const record=records.find(r=>r.id===id);if(!record)return;
+ const record=records.find(r=>r.id===id);if(!record)return;const targetSet=setIndex===null?null:structuredClone(record.sets[setIndex]);const originalSetSignature=JSON.stringify(record.sets);if(setIndex!==null&&!targetSet)return;
  requestConfirmation(setIndex===null?'删除这条训练记录？':'删除这一组？',()=>{
   const current=records.find(r=>r.id===id);if(!current)return;
   const original=structuredClone(current);let removedSet=null;
+  if(setIndex!==null){if(!targetSet.id&&!targetSet.sourceSetId&&JSON.stringify(current.sets)!==originalSetSignature)return toast('这一组已变化，请重新选择',true);const nextIndex=current.sets.findIndex(s=>targetSet.id?s.id===targetSet.id:targetSet.sourceSetId?s.sourceSetId===targetSet.sourceSetId:JSON.stringify(s)===JSON.stringify(targetSet));if(nextIndex<0)return toast('这一组已变化，请重新选择',true);setIndex=nextIndex;}
   if(setIndex===null){records=records.filter(r=>r.id!==id);}else{removedSet=current.sets.splice(setIndex,1)[0];if(!current.sets.length)records=records.filter(r=>r.id!==id);}
   saveRecords();if(editingId===id)closeOverlay('advancedOverlay');syncTrainingViews();
   toast('训练已删除',false,()=>{const existing=records.find(r=>r.id===id);if(removedSet&&existing)existing.sets.splice(Math.min(setIndex,existing.sets.length),0,removedSet);else if(!existing)records.push(original);saveRecords();syncTrainingViews();});
@@ -113,11 +114,11 @@ function openEditor(id=null,muscle=selectedRegion,name=''){
 document.querySelector('#cancelEdit').onclick=()=>{editingId=null;openEditor(null,document.querySelector('#trainMuscle').value);toast('表单已清空');};
 document.querySelector('#trainingForm').addEventListener('submit',e=>{e.preventDefault();const name=document.querySelector('#trainName').value.trim(), date=document.querySelector('#trainDate').value,muscle=document.querySelector('#trainMuscle').value;const old=records.find(x=>x.id===editingId);
  if(!name||(!date&&(!old||old.date)))return toast('请填写训练日期和动作名称',true);
- const sets=draftSets.map(s=>({...s,duration:s.duration===''||s.duration==null?null:+s.duration,weight:s.weight===''?null:+s.weight,reps:s.reps===''?null:+s.reps,failureAt:s.failureAt===''?null:+s.failureAt,formBreakAt:s.formBreakAt===''?null:+s.formBreakAt,unit:s.unit||'',plus:!!s.plus,verified:s.verified!==false,
+ const sets=draftSets.map((s,index)=>({...s,id:s.id||UID(),createdAt:s.createdAt??(old?.sets?.[index]?(Number(old.createdAt)||Date.now())+index*.001:Date.now()+index*.001),duration:s.duration===''||s.duration==null?null:+s.duration,weight:s.weight===''?null:+s.weight,reps:s.reps===''?null:+s.reps,failureAt:s.failureAt===''?null:+s.failureAt,formBreakAt:s.formBreakAt===''?null:+s.formBreakAt,unit:s.unit||'',plus:!!s.plus,verified:s.verified!==false,
   weightText:s.weight===''?s.weightText:undefined,repsText:s.reps===''?s.repsText:undefined}));
  for(let i=0;i<sets.length;i++){const s=sets[i];if([s.weight,s.reps,s.duration,s.failureAt,s.formBreakAt].some(x=>x!==null&&(!Number.isFinite(x)||x<0)))return toast(`第 ${i+1} 组有无效数值`,true);if(s.duration!==null&&s.duration<=0)return toast(`第 ${i+1} 组时长须为正数`,true);if(!old&&s.reps===null&&s.duration===null)return toast(`第 ${i+1} 组请填写次数或时长`,true);if(s.reps!==null&&(s.reps<1||s.reps>999))return toast(`第 ${i+1} 组次数须在 1 至 999 之间`,true);if([s.failureAt,s.formBreakAt].some(x=>x!==null&&(!Number.isInteger(x)||x<1)))return toast(`第 ${i+1} 组力竭/变形次数须为正整数`,true);if(s.reps!==null&&((s.failureAt!==null&&s.failureAt>s.reps)||(s.formBreakAt!==null&&s.formBreakAt>s.reps)))return toast(`第 ${i+1} 组力竭/变形次数不能超过已完成次数`,true);}
  const item={...old,id:editingId||UID(),date:date||null,muscle,name,sets,legacy:!!old?.legacy && sets.every(s=>!s.verified),quickEntry:old?.quickEntry===true,recentV4:old?.recentV4===true||!editingId,notes:document.querySelector('#trainNotes').value.trim(),createdAt:old?.createdAt||Date.now()};
- if(old){records=records.map(x=>x.id===editingId?item:x);}else records.push(item);try{saveRecords();}catch{toast('浏览器空间不足，保存失败',true);return;}editingId=null;toast('训练已保存 · 已更新历史与日历');renderDashboard();renderHistory();renderCalendar();closeOverlay('advancedOverlay');refreshQuickHome();
+ const previous=structuredClone(records);if(old){records=records.map(x=>x.id===editingId?item:x);}else records.push(item);const badgeIndex=window.TrainingMetrics?.buildPRIndex(records);const isNewPR=item.sets.some((set,index)=>badgeIndex?.has(window.TrainingMetrics.key(item.id,index))&&JSON.stringify(old?.sets?.[index])!==JSON.stringify(set));try{saveRecords();}catch{records=previous;toast('浏览器空间不足，保存失败',true);return;}editingId=null;toast(isNewPR?'新纪录！训练已保存':'训练已保存 · 已更新历史与日历');if(!old||item.sets.length>old.sets.length)window.RestTimer?.start();renderDashboard();renderHistory();renderCalendar();closeOverlay('advancedOverlay');refreshQuickHome();
 });
 
 
@@ -151,8 +152,8 @@ function renderAnalytics(){
  const counts=MUSCLE_NAMES.map(name=>({name,n:records.filter(r=>r.muscle===name).reduce((sum,r)=>sum+(r.sets||[]).filter(st=>st&&st.verified===true).length,0)})).filter(x=>x.n>0).sort((a,b)=>b.n-a.n);
  const total=counts.reduce((n,x)=>n+x.n,0),fallback='conic-gradient(#2b3f50 0% 100%)';
  let acc=0;
- const segments=counts.map((x,i)=>{const from=acc;acc+=100*x.n/total;return `${CHART_COLORS[i%CHART_COLORS.length]} ${from.toFixed(2)}% ${acc.toFixed(2)}%`;});
- document.querySelector('#muscleOverviewChart').innerHTML=total?`<div class="muscle-donut" role="img" aria-label="已确认的肌群训练组数占比" style="background:conic-gradient(${segments.join(',')})"><div class="muscle-donut-hole"><span>${counts.length}<small>训练肌群</small></span></div></div><div class="muscle-legend">${counts.map((x,i)=>`<div class="muscle-legend-item" title="${h(x.name)}：${x.n} 条"><span class="muscle-legend-key"><i style="background:${CHART_COLORS[i%CHART_COLORS.length]}"></i>${h(x.name)}</span><span>${Math.round(x.n/total*100)}%</span></div>`).join('')}</div>`:`<div class="empty-state">暂时没有已确认的训练组。</div>`;
+ const segments=counts.map((x,i)=>{const from=acc;acc+=100*x.n/total;return `${window.MUSCLE_COLORS?.[x.name]||CHART_COLORS[MUSCLE_NAMES.indexOf(x.name)]} ${from.toFixed(2)}% ${acc.toFixed(2)}%`;});
+ document.querySelector('#muscleOverviewChart').innerHTML=total?`<div class="muscle-donut" role="img" aria-label="已确认的肌群训练组数占比" style="background:conic-gradient(${segments.join(',')})"><div class="muscle-donut-hole"><span>${counts.length}<small>训练肌群</small></span></div></div><div class="muscle-legend">${counts.map((x,i)=>`<div class="muscle-legend-item" title="${h(x.name)}：${x.n} 条"><span class="muscle-legend-key"><i style="background:${window.MUSCLE_COLORS?.[x.name]||CHART_COLORS[MUSCLE_NAMES.indexOf(x.name)]}"></i>${h(x.name)}</span><span>${Math.round(x.n/total*100)}%</span></div>`).join('')}</div>`:`<div class="empty-state">暂时没有已确认的训练组。</div>`;
 }
 
 let historyMode='date',historyDayLimit=20;
@@ -340,7 +341,7 @@ function collectActionTrend(action,range,metric,preferredUnit) {
  // 单位切换只影响重量/训练量。默认用最近有记录的单位，未标单位作为独立选项。
  const lastLoaded=allSets.findLast(set=>numericSetValue(set.weight)!==null&&!set.plus);
  const unit=units.includes(preferredUnit)?preferredUnit:(lastLoaded?(lastLoaded.unit||''):(units[0]||''));
- const prDays=new Set((window.TrainingMetrics?.getPRs(records)||[]).filter(item=>action&&item.record.name===action.name&&item.record.muscle===action.muscle).map(item=>item.record.date));
+ const prDays=new Set((window.TrainingMetrics?.getPRs(records)||[]).filter(item=>action&&item.record.name===action.name&&item.record.muscle===action.muscle&&(!['weight','volume'].includes(metric)||(item.set.unit||'')===unit)).map(item=>item.record.date));
  const series=trendDisplay==='sets'?TREND_SETS.map((style,index)=>({...style,values:sessions.map(session=>trendSetValue(session.sets[index],metric,unit))})):[{name:metric==='volume'?'当日总训练量':'每次训练最佳组',color:'#91ead0',dash:'',values:sessions.map(session=>{const values=session.sets.map(s=>trendSetValue(s,metric,unit)).filter(n=>n!==null);return values.length?(metric==='volume'?values.reduce((n,x)=>n+x,0):Math.max(...values)):null;})}];
  const estimates=allSets.filter(s=>s.unit===unit).map(s=>window.TrainingMetrics?.estimate1RM(s)).filter(n=>n!==null&&n!==undefined);
  const eligibleLoads=allSets.map(set=>trendSetValue(set,'weight',unit)).filter(value=>value!==null);
@@ -548,42 +549,37 @@ document.querySelector('#dayDetails').addEventListener('click',async e=>{const n
 
 
 function blobAsDataURL(blob){return new Promise((resolve,reject)=>{const rd=new FileReader();rd.onload=()=>resolve(rd.result);rd.onerror=reject;rd.readAsDataURL(blob);});}
-async function exportData(){const b=document.querySelector('#exportBtn');b.disabled=true;b.textContent='正在准备备份…';try{const photoIds=[...new Set(Object.values(checkins).flatMap(ch=>ch.photos||[]))],images={};for(const id of photoIds){try{const blob=await imageGet(id);if(blob)images[id]=await blobAsDataURL(blob);}catch{}}
- const payload={app:'MotionLog',version:1,exportedAt:new Date().toISOString(),records,checkins,images,gifBindings};const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`motionlog-backup-${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);toast('已生成完整 JSON 备份');}catch(e){toast('备份失败：'+e.message,true);}finally{b.disabled=false;b.textContent='导出备份';}}
+async function exportData(){
+ const b=document.querySelector('#exportBtn');b.disabled=true;b.textContent='正在准备备份…';
+ try{const photoIds=[...new Set(Object.values(checkins).flatMap(ch=>ch.photos||[]))],images={};
+  for(const id of photoIds){const blob=await imageGet(id);if(!blob)throw Error('照片 '+id+' 尚未下载，请联网同步后重试');images[id]=await blobAsDataURL(blob);}
+  const payload={app:'MotionLog',version:1,exportedAt:new Date().toISOString(),records,checkins,images,gifBindings,preferences:appPreferences};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download=`motionlog-backup-${today()}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),3000);toast('完整 JSON 备份已生成');
+ }catch(error){toast('备份未完成：'+error.message,true);}finally{b.disabled=false;b.textContent='导出备份';}
+}
+
 document.querySelector('#exportBtn').onclick=exportData;document.querySelector('#importBtn').onclick=()=>document.querySelector('#importFile').click();
 
 function dataURLtoBlob(url){const [header,base64]=url.split(',');const type=header.match(/data:(.*?);base64/)?.[1]||'application/octet-stream';const raw=atob(base64),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return new Blob([bytes],{type});}
-document.querySelector('#importFile').addEventListener('change',async e=>{
- const file=e.target.files[0];
- e.target.value='';
- if (!file) return;
- try {
-  const backup=JSON.parse(await file.text());
-  if (backup.app!=='MotionLog'||backup.version!==1||!Array.isArray(backup.records)||!backup.checkins||typeof backup.checkins!=='object') {
-   throw Error('不是有效的 MotionLog v1 备份');
-  }
-  if (!confirm(`从备份恢复 ${backup.records.length} 条训练记录？将覆盖当前训练与打卡记录。`)) return;
-    
-  for (const [id,src] of Object.entries(backup.images||{})) {
-   if (typeof src==='string'&&src.startsWith('data:')) await imagePut(id,dataURLtoBlob(src));
-  }
-  records=backup.records;
-  checkins=backup.checkins;
-  saveRecords();
-  saveCheckins();
-  
-  if (backup.gifBindings&&typeof backup.gifBindings==='object'&&!Array.isArray(backup.gifBindings)) {
-   gifBindings=backup.gifBindings;
-   saveGifBindings();
-   renderCatalogPreview();
-  }
-  syncTrainingViews();
-  toast('备份已恢复');
- } catch (err) {
-  toast('导入失败：'+err.message,true);
- }
-});
-
+function validateBackup(backup){
+ const object=x=>!!x&&typeof x==='object'&&!Array.isArray(x);
+ if(!object(backup)||backup.app!=='MotionLog'||backup.version!==1||!Array.isArray(backup.records)||backup.records.length>50000||!object(backup.checkins))throw Error('不是有效的 MotionLog v1 备份');
+ const ids=new Set();for(const row of backup.records){if(!object(row)||typeof row.id!=='string'||ids.has(row.id)||typeof row.name!=='string'||typeof row.muscle!=='string'||!Array.isArray(row.sets)||row.sets.some(s=>!object(s))||row.date!==null&&(!/^\d{4}-\d{2}-\d{2}$/.test(row.date||'')))throw Error('训练记录格式有误');ids.add(row.id);}
+ for(const [date,ch] of Object.entries(backup.checkins))if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!object(ch)||!Array.isArray(ch.notes)||!Array.isArray(ch.photos)||ch.photos.some(id=>typeof id!=='string')||ch.notes.some(n=>!object(n)||typeof n.id!=='string'||typeof n.text!=='string'))throw Error('打卡记录格式有误');
+ if(backup.images!==undefined&&!object(backup.images))throw Error('照片格式有误');if(backup.gifBindings!==undefined&&!object(backup.gifBindings))throw Error('动作演示格式有误');
+ return backup;
+}
+async function restoreBackup(backup){
+ validateBackup(backup);const decoded=new Map();for(const [id,url] of Object.entries(backup.images||{})){if(typeof url!=='string'||!/^data:image\/[a-z0-9.+-]+;base64,/i.test(url))throw Error('照片数据格式有误');const blob=dataURLtoBlob(url);if(!blob.size||blob.size>24*1024*1024)throw Error('照片大小不正确');decoded.set(id,blob);}
+ for(const id of new Set(Object.values(backup.checkins).flatMap(ch=>ch.photos)))if(!decoded.has(id)&&!await imageGet(id))throw Error('备份缺少照片 '+id);
+ const previous={records:structuredClone(records),checkins:structuredClone(checkins),gifBindings:structuredClone(gifBindings),preferences:structuredClone(appPreferences)};const originals=new Map(),written=[];
+ try{
+  for(const [id,blob] of decoded){originals.set(id,await imageGet(id));await imagePut(id,blob);written.push(id);}
+  records=structuredClone(backup.records);checkins=structuredClone(backup.checkins);gifBindings=structuredClone(backup.gifBindings||{});if(backup.preferences&&typeof backup.preferences==='object'&&!Array.isArray(backup.preferences))appPreferences=structuredClone(backup.preferences);
+  saveRecords();saveCheckins();saveGifBindings();savePreferences();syncTrainingViews();
+ }catch(error){records=previous.records;checkins=previous.checkins;gifBindings=previous.gifBindings;appPreferences=previous.preferences;for(const id of written){const blob=originals.get(id);try{if(blob)await imagePut(id,blob);else await imageDelete(id);}catch{}}try{saveRecords();saveCheckins();saveGifBindings();savePreferences();}catch{}syncTrainingViews();throw error;}
+}
+document.querySelector('#importFile').addEventListener('change',async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;try{const backup=validateBackup(JSON.parse(await file.text()));if(!confirm(`从备份恢复 ${backup.records.length} 条训练记录？将覆盖当前训练与打卡记录。`))return;await restoreBackup(backup);toast('备份已恢复');}catch(error){toast('导入失败：'+error.message,true);}});
 
 const ACTION_GROUPS={
  '背部':[
@@ -925,9 +921,9 @@ function renderLastWorkout() {
     set.failureAt > 0 ? `第 ${set.failureAt} 次力竭` : '',
     set.formBreakAt > 0 ? `第 ${set.formBreakAt} 次变形` : '',
     set.note,
-    Number.isFinite(set.weight) && !set.unit ? '单位未记' : ''
+    ''
    ].filter(Boolean).join(' · ');
-   const canFill = !legacy && (copyableLastWeight(set) || copyableLastReps(set));
+   const canFill = !legacy && (copyableLastWeight(set) || copyableLastReps(set)||set.duration>0);
    return `<div class="last-workout-set">
     <div><div class="last-workout-values"><span>${groupLabel}</span><strong>${quickSetText(set)}</strong></div>${quality ? `<span class="last-workout-quality">${h(quality)}</span>` : ''}</div>
     ${canFill ? `<button type="button" class="last-workout-use" data-last-record="${h(recordId)}" data-last-set="${index}" title="带入第 ${setNumber} 组">带入</button>` : ''}
@@ -935,7 +931,7 @@ function renderLastWorkout() {
   }).join('');
   const notes = action.records.filter(record => record.notes).map(record => `<p class="last-workout-note">${h(record.notes)}</p>`).join('');
   return `<section class="last-workout-action">
-   <header class="last-workout-action-heading"><div><h3>${h(action.name)}</h3>${target ? `<small class="last-workout-target">${h(target)}</small>` : ''}</div>
+   <header class="last-workout-action-heading"><div><h3>${h(action.name)}</h3>${action.sets.some(p=>Number.isFinite(p.set.weight)&&!p.set.unit)?`<small class="last-workout-unit-hint">单位未记 <button type="button" data-fill-unit="${h(action.name)}" data-fill-muscle="${h(muscle)}">补单位</button></small>`:''}${target ? `<small class="last-workout-target">${h(target)}</small>` : ''}</div>
    <button type="button" class="last-workout-use" data-last-record="${h(action.records[0].id)}">选此动作</button></header>${rows}${notes}
   </section>`;
  }).join('');
@@ -953,6 +949,7 @@ document.getElementById('lastWorkoutBody').addEventListener('click', event => {
  // 只将可靠数值带入草稿，力竭、变形和备注留在历史侧供参考。
  weight.value = usableSet && copyableLastWeight(set) ? String(set.weight) : '';
  document.getElementById('quickReps').value = usableSet && copyableLastReps(set) ? String(set.reps) : '';
+ document.getElementById('quickDuration').value=usableSet&&set.duration>0?set.duration:'';lastQuickAction=[record.name,muscle,document.getElementById('quickDate').value].join('|');
  if (usableSet && ['kg','lb','片',''].includes(set.unit)) document.getElementById('quickUnit').value = set.unit;
  weight.focus();
 });
@@ -983,13 +980,13 @@ document.getElementById('quickMuscle').innerHTML=MUSCLE_NAMES.map(x=>`<option va
 document.getElementById('quickAction').addEventListener('change',()=>{
  prefillQuickAction();
 });
-document.getElementById('quickMuscle').addEventListener('change',renderLastWorkout);
-document.getElementById('quickDate').addEventListener('change',refreshQuickHome);
+document.getElementById('quickMuscle').addEventListener('change',()=>{lastQuickAction='';prefillQuickAction();renderLastWorkout();});
+document.getElementById('quickDate').addEventListener('change',()=>{prefillQuickAction();refreshQuickHome();});
 document.getElementById('openPicker').addEventListener('click',()=>{catalogMuscle=document.getElementById('quickMuscle').value;catalogEquip='全部';renderCatalog();openOverlay('pickerOverlay');void ensureGifs();});
 document.getElementById('quickAdvanced').addEventListener('click',()=>{
  openEditor(null,document.getElementById('quickMuscle').value,document.getElementById('quickAction').value.trim());
  document.querySelector('#trainDate').value=document.getElementById('quickDate').value;
- if(draftSets[0]){draftSets[0].weight=document.getElementById('quickWeight').value;draftSets[0].reps=document.getElementById('quickReps').value;draftSets[0].unit=document.getElementById('quickUnit').value;renderSetRows();}
+ if(draftSets[0]){draftSets[0].weight=document.getElementById('quickWeight').value;draftSets[0].reps=document.getElementById('quickReps').value;draftSets[0].duration=document.getElementById('quickDuration').value;draftSets[0].unit=document.getElementById('quickUnit').value;renderSetRows();}
  openOverlay('advancedOverlay');
 });
 document.getElementById('quickForm').addEventListener('submit',e=>{
@@ -1000,7 +997,7 @@ document.getElementById('quickForm').addEventListener('submit',e=>{
  if(!name||!date||(reps===''&&duration===null))return toast('请填写动作、日期和次数或时长',true);
  const weight=w===''?null:+w,rep=reps===''?null:+reps;
  if((weight!==null&&(!Number.isFinite(weight)||weight<0))||(rep!==null&&(!Number.isInteger(rep)||rep<1||rep>999))||(duration!==null&&(!Number.isFinite(duration)||duration<=0)))return toast('重量应为非负数，次数应为正整数',true);
- const s={id:UID(),weight,reps:rep,duration,unit,plus:false,failureAt:null,formBreakAt:null,verified:true};
+ const s={id:UID(),createdAt:Date.now(),weight,reps:rep,duration,unit,plus:false,failureAt:null,formBreakAt:null,verified:true};
  saveQuickUnit();
  const existing=[...records].reverse().find(r=>r.quickEntry===true&&r.date===date&&r.name===name&&r.muscle===muscle);
  if(existing){existing.sets.push(s);}else{records.push({id:UID(),date,name,muscle,sets:[s],legacy:false,quickEntry:true,recentV4:true,notes:'',createdAt:Date.now()});}
@@ -1161,3 +1158,5 @@ document.getElementById('dayDetails').addEventListener('click',e=>{const img=e.t
 document.getElementById('dayDetails').addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)&&e.target.dataset.previewPhoto){e.preventDefault();void previewSavedPhoto(e.target.dataset.previewPhoto);}});
 
 if('serviceWorker' in navigator&&location.protocol!=='file:')window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{});});
+
+document.getElementById('lastWorkoutBody').addEventListener('click',e=>{const button=e.target.closest('[data-fill-unit]');if(!button)return;const name=button.dataset.fillUnit,muscle=button.dataset.fillMuscle;const dialog=document.createElement('dialog');dialog.innerHTML='<form method="dialog"><h2>补充动作单位</h2><p></p><select name="unit"><option>kg</option><option>lb</option><option>片</option></select><button value="cancel">取消</button><button value="save">保存</button></form>';dialog.querySelector('p').textContent='为「'+name+'」所有未记单位的组补充单位；已有单位不变。';dialog.addEventListener('close',()=>{if(dialog.returnValue==='save'){const unit=dialog.querySelector('select').value;const changed=[];for(const row of records)if(row.name===name&&row.muscle===muscle)for(const set of row.sets||[])if(!set.unit){changed.push({recordId:row.id,set,previous:set.unit});set.unit=unit;}saveRecords();syncTrainingViews();toast('单位已补充',false,()=>{for(const item of changed){const row=records.find(r=>r.id===item.recordId);const set=row?.sets?.find(s=>s.id&&s.id===item.set.id||JSON.stringify(s)===JSON.stringify(item.set));if(set)set.unit=item.previous;}saveRecords();syncTrainingViews();});}dialog.remove();button.isConnected&&button.focus();});document.body.append(dialog);dialog.showModal();});

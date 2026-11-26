@@ -3,6 +3,8 @@
  * Also accepts {record, set, setIndex}; existing candidates compare predecessors.
  * First eligible set establishes a baseline, with no PR toast or badge.
  * getPRs(records) returns chronological {recordId,setIndex,...result} rows.
+ * Chronology: record.date, then set.createdAt (fallback record.createdAt),
+ * then original record/set indexes for stable legacy and equal-time ordering.
  * buildPRIndex(records) is a Map keyed by key(recordId,setIndex).
  * estimate1RM(set) returns a number in that set's kg/lb unit, or null.
  */
@@ -24,13 +26,21 @@
   }
   const key = (recordId, setIndex) => `${recordId}:${setIndex}`;
   const groupKey = (record, set) => JSON.stringify([text(record.name), text(record.muscle), text(set.unit)]);
+  function timestamp(value) {
+    if (value == null || text(value) === '') return null;
+    const numeric = number(value);
+    if (Number.isFinite(numeric)) return numeric;
+    const parsed = typeof value === 'string' ? Date.parse(value) : NaN;
+    return Number.isFinite(parsed) ? parsed : null;
+  }
   function entries(records) {
     return (Array.isArray(records) ? records : []).filter(Boolean)
-      .map((record, index) => ({record, index}))
+      .flatMap((record, recordIndex) => (Array.isArray(record.sets) ? record.sets : []).map((set, setIndex) => ({
+        record, set, setIndex, recordIndex,
+        time: timestamp(set?.createdAt) ?? timestamp(record.createdAt) ?? 0
+      })))
       .sort((a, b) => text(a.record.date).localeCompare(text(b.record.date)) ||
-        (Number(a.record.createdAt) || Date.parse(a.record.createdAt) || 0) -
-        (Number(b.record.createdAt) || Date.parse(b.record.createdAt) || 0) || a.index - b.index)
-      .flatMap(({record}) => (Array.isArray(record.sets) ? record.sets : []).map((set, setIndex) => ({record, set, setIndex})));
+        a.time - b.time || a.recordIndex - b.recordIndex || a.setIndex - b.setIndex);
   }
   function result(set, previous) {
     const valid = eligible(set), weight = number(set?.weight), reps = number(set?.reps);

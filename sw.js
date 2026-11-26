@@ -5,7 +5,7 @@
  * responsibility of sync.js (localStorage/IndexedDB + its existing pending queue).
  */
 'use strict';
-const VERSION = 'motionlog-v15-shell-1';
+const VERSION = 'motionlog-v15-shell-2';
 const CACHE_PREFIX = 'motionlog-v15-shell-';
 const BASE = new URL('./', self.location.href);
 const SHELL = [
