@@ -1339,9 +1339,7 @@ document.querySelector('#catalogPreview').addEventListener('click',e=>{
  }
 });
 /* 在旧训练表单保存、历史删除、JSON 恢复后刷新首页汇总。 */
-document.querySelector('#trainingForm').addEventListener('submit',()=>setTimeout(()=>{
- refreshQuickHome();if(!editingId)closeOverlay('advancedOverlay');
-},0));
+
 document.getElementById('historyList').addEventListener('click',()=>setTimeout(refreshQuickHome,40));
 refreshQuickHome();
 
